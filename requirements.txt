@@ -1,0 +1,19 @@
+# Interface
+streamlit>=1.35
+
+# Dados e cálculos
+pandas>=2.2
+numpy>=1.26
+
+# Gráficos
+plotly>=5.22
+
+# Leitura de PDF (módulo de documentos)
+pdfplumber>=0.11
+
+# IA para resumo de documentos
+# anthropic>=0.28
+
+# Utilitários
+pyyaml>=6.0        # leitura dos .yaml de config
+bcrypt>=4.1        # hash de senhas no users.yaml
