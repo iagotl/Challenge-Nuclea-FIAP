@@ -31,9 +31,9 @@ LOGO_SVG = """<svg width="40" height="40" viewBox="0 0 60 60" fill="none">
 </svg>"""
 
 
-# ---------------------------------------------------------------------------
+
 # ESTILOS GLOBAIS
-# ---------------------------------------------------------------------------
+
 
 def _aplicar_estilo():
     st.markdown("""
@@ -120,9 +120,9 @@ def _aplicar_estilo():
     """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
+
 # PROCESSOR
-# ---------------------------------------------------------------------------
+
 
 @st.cache_resource(show_spinner=False)
 def _processar_na_inicializacao():
@@ -153,9 +153,9 @@ def _renderizar_log(resumo: dict):
     st.markdown("".join(linhas), unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
+
 # TELA DE LOGIN
-# ---------------------------------------------------------------------------
+
 
 def _tela_login():
     _, col, _ = st.columns([1.2, 1, 1.2])
@@ -243,10 +243,8 @@ def _tela_login():
                     st.error("Usuário ou senha incorretos.")
 
 
-# ---------------------------------------------------------------------------
-# SIDEBAR
-# ---------------------------------------------------------------------------
 
+# SIDEBAR
 def _renderizar_sidebar(usuario: dict):
     with st.sidebar:
         st.markdown(f"""
@@ -285,9 +283,9 @@ def _renderizar_sidebar(usuario: dict):
             st.rerun()
 
 
-# ---------------------------------------------------------------------------
+
 # HOME
-# ---------------------------------------------------------------------------
+
 
 def _tela_home(usuario: dict):
     st.markdown(f"""
@@ -323,9 +321,9 @@ def _tela_home(usuario: dict):
             """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
+
 # MAIN
-# ---------------------------------------------------------------------------
+
 
 def main():
     _aplicar_estilo()
