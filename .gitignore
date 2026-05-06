@@ -1,0 +1,43 @@
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Cache de dados processados (gerado automaticamente, não sobe pro git)
+data/funds/*/informes/cache/
+data/funds/*/informes/processed/
+data/funds/*/documentos/cache/
+data/funds/*/documentos/processed/
+
+# Dados brutos (XMLs e PDFs ficam fora do git — pesados e sensíveis)
+data/funds/*/informes/inbox/
+data/funds/*/documentos/inbox/
+
+# Configuração sensível
+config/users.yaml
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
