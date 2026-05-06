@@ -1,0 +1,313 @@
+/* ============================================================
+   RAIZ · FIDC — Global Styles
+   Aplicado via st.markdown() no app.py
+   ============================================================ */
+
+/* Importa fontes */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+
+/* ── Variáveis de marca ── */
+:root {
+  --raiz-blue:       #002775;
+  --raiz-teal:       #407b6e;
+  --raiz-teal-light: #4d9485;
+  --raiz-dark-1:     #0d1415;
+  --raiz-dark-2:     #3a4e50;
+  --raiz-white:      #ffffff;
+  --raiz-muted:      rgba(255,255,255,0.45);
+  --raiz-border:     rgba(255,255,255,0.08);
+  --font-main:       'DM Sans', sans-serif;
+  --font-mono:       'DM Mono', monospace;
+}
+
+/* ── Reset geral ── */
+html, body, [class*="css"] {
+  font-family: var(--font-main) !important;
+}
+
+/* ── Remove padding padrão do Streamlit ── */
+.block-container {
+  padding-top: 1.5rem !important;
+  padding-bottom: 2rem !important;
+}
+
+/* ── Esconde header e footer padrão do Streamlit ── */
+header[data-testid="stHeader"] { display: none !important; }
+footer { display: none !important; }
+#MainMenu { display: none !important; }
+
+/* ============================================================
+   TELA DE LOGIN
+   ============================================================ */
+
+.raiz-login-wrap {
+  min-height: 480px;
+  background: linear-gradient(180deg, #0d1415 0%, #3a4e50 100%);
+  border-radius: 16px;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Painel esquerdo — azul da marca */
+.raiz-login-left {
+  width: 52%;
+  background: var(--raiz-blue);
+  padding: 44px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+.raiz-login-left::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: rgba(64,123,110,0.18);
+  pointer-events: none;
+}
+
+.raiz-login-left::after {
+  content: '';
+  position: absolute;
+  bottom: -60px; left: -60px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: rgba(64,123,110,0.12);
+  pointer-events: none;
+}
+
+.raiz-brand { position: relative; z-index: 1; }
+
+.raiz-wordmark {
+  font-size: 34px;
+  font-weight: 500;
+  color: var(--raiz-white);
+  letter-spacing: 0.12em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.raiz-wordmark-dot { color: var(--raiz-teal); }
+
+.raiz-tagline {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+.raiz-product { position: relative; z-index: 1; }
+
+.raiz-product-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 8px;
+}
+
+.raiz-product-name {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--raiz-white);
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.raiz-product-desc {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.7;
+}
+
+.raiz-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.raiz-pill {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(64,123,110,0.45);
+  color: rgba(255,255,255,0.55);
+  background: rgba(64,123,110,0.1);
+}
+
+/* Painel direito — formulário */
+.raiz-login-right {
+  flex: 1;
+  padding: 44px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.raiz-login-eyebrow {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--raiz-teal);
+  margin-bottom: 8px;
+}
+
+.raiz-login-title {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--raiz-white);
+  margin-bottom: 4px;
+}
+
+.raiz-login-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 28px;
+}
+
+.raiz-field-label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Inputs do Streamlit dentro da tela de login */
+.raiz-login-right input[type="text"],
+.raiz-login-right input[type="password"] {
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  color: var(--raiz-white) !important;
+  font-family: var(--font-main) !important;
+}
+
+.raiz-login-right input:focus {
+  border-color: var(--raiz-teal) !important;
+  box-shadow: none !important;
+}
+
+/* Botão primário — cor da marca */
+.raiz-login-right button[kind="primaryFormSubmit"],
+.raiz-login-right .stButton > button {
+  background: var(--raiz-teal) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  color: var(--raiz-white) !important;
+  font-family: var(--font-main) !important;
+  font-weight: 500 !important;
+}
+
+.raiz-login-right .stButton > button:hover {
+  background: var(--raiz-teal-light) !important;
+}
+
+.raiz-login-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: rgba(255,255,255,0.25);
+  line-height: 1.6;
+}
+
+.raiz-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 12px;
+}
+
+.raiz-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--raiz-teal);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   LOG DE INICIALIZAÇÃO
+   ============================================================ */
+
+.raiz-log-box {
+  background: #0a0f10;
+  border: 1px solid rgba(64,123,110,0.3);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.9;
+  margin-bottom: 1rem;
+}
+
+.log-ok    { color: #4adb8a; }
+.log-warn  { color: #f5a623; }
+.log-err   { color: #ff5a4a; }
+.log-info  { color: #407b6e; }
+.log-muted { color: #3a4e50; }
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+[data-testid="stSidebar"] {
+  background: var(--raiz-dark-1) !important;
+  border-right: 1px solid rgba(64,123,110,0.2) !important;
+}
+
+[data-testid="stSidebar"] * {
+  font-family: var(--font-main) !important;
+  color: var(--raiz-white) !important;
+}
+
+[data-testid="stSidebarNav"] {
+  padding-top: 0.5rem;
+}
+
+/* ============================================================
+   CONTEÚDO PRINCIPAL
+   ============================================================ */
+
+.main .block-container {
+  background: transparent;
+}
+
+/* Métricas */
+[data-testid="stMetric"] {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(64,123,110,0.2);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+[data-testid="stMetricLabel"] p {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5) !important;
+}
+
+[data-testid="stMetricValue"] {
+  font-family: var(--font-mono) !important;
+  font-size: 22px !important;
+  color: var(--raiz-white) !important;
+}
