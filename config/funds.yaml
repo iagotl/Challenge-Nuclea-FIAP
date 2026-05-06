@@ -1,0 +1,10 @@
+funds:
+  - id: xama
+    nome: "XAMA! FIDC Não-Padronizado"
+    cnpj: "47669160000191"
+    ativo: true
+
+  - id: fundo_b
+    nome: "Nome do Fundo B"
+    cnpj: "00000000000000"
+    ativo: true
