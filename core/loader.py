@@ -285,6 +285,7 @@ def listar_documentos(base_dir: str | Path, fundo_id: str) -> dict[str, list[dic
                 "tipo":        tipo,
                 "label":       label,
                 "tem_insight": (tipo_dir / f"{pdf.stem}.md").exists(),
+                **parsear_nome_arquivo(pdf.stem),
             }
             for pdf in pdfs
         ]
@@ -332,41 +333,116 @@ def carregar_pdf_bytes(pdf_path: Path) -> bytes | None:
         return None
 
 
-def carregar_notas(base_dir: str | Path, fundo_id: str, tipo: str, stem: str) -> str:
+# ---------------------------------------------------------------------------
+# NOTAS DE DOCUMENTOS
+# ---------------------------------------------------------------------------
+
+import re as _re
+import uuid as _uuid
+from datetime import datetime as _dt
+
+
+def _notes_path(base_dir: Path, fundo_id: str, tipo: str, stem: str) -> Path:
+    return base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.json"
+
+
+def carregar_notas(base_dir: str | Path, fundo_id: str, tipo: str, stem: str) -> list[dict]:
     """
-    Carrega as notas de um documento (.notes.md).
-    Retorna string vazia se não existir.
+    Carrega lista de notas de um documento.
+    Cada nota: {id, titulo, conteudo, criado_em, editado_em}
     """
-    base_dir  = Path(base_dir)
-    path      = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.md"
+    base_dir = Path(base_dir)
+    path     = _notes_path(base_dir, fundo_id, tipo, stem)
     if not path.exists():
-        return ""
+        return []
     try:
-        return path.read_text(encoding="utf-8")
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
         log.error(f"Erro ao ler notas {path}: {e}")
-        return ""
+        return []
 
 
-def salvar_notas(base_dir: str | Path, fundo_id: str, tipo: str, stem: str, conteudo: str) -> bool:
-    """
-    Salva as notas de um documento (.notes.md).
-
-    Returns:
-        True se salvo com sucesso, False em caso de erro.
-    """
-    base_dir  = Path(base_dir)
-    path      = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.md"
+def salvar_notas(base_dir: str | Path, fundo_id: str, tipo: str, stem: str, notas: list[dict]) -> bool:
+    """Salva lista de notas em JSON."""
+    base_dir = Path(base_dir)
+    path     = _notes_path(base_dir, fundo_id, tipo, stem)
     try:
-        path.write_text(conteudo, encoding="utf-8")
+        path.write_text(json.dumps(notas, ensure_ascii=False, indent=2), encoding="utf-8")
         return True
     except Exception as e:
         log.error(f"Erro ao salvar notas {path}: {e}")
         return False
 
 
+def adicionar_nota(base_dir: str | Path, fundo_id: str, tipo: str, stem: str,
+                   titulo: str, conteudo: str) -> bool:
+    """Adiciona uma nova nota à lista existente."""
+    notas = carregar_notas(base_dir, fundo_id, tipo, stem)
+    agora = _dt.now().isoformat()
+    notas.append({
+        "id":         str(_uuid.uuid4())[:8],
+        "titulo":     titulo.strip() or "Nota sem título",
+        "conteudo":   conteudo.strip(),
+        "criado_em":  agora,
+        "editado_em": agora,
+    })
+    return salvar_notas(base_dir, fundo_id, tipo, stem, notas)
+
+
+def editar_nota(base_dir: str | Path, fundo_id: str, tipo: str, stem: str,
+                nota_id: str, titulo: str, conteudo: str) -> bool:
+    """Edita uma nota existente pelo ID."""
+    notas = carregar_notas(base_dir, fundo_id, tipo, stem)
+    for nota in notas:
+        if nota["id"] == nota_id:
+            nota["titulo"]     = titulo.strip() or "Nota sem título"
+            nota["conteudo"]   = conteudo.strip()
+            nota["editado_em"] = _dt.now().isoformat()
+            return salvar_notas(base_dir, fundo_id, tipo, stem, notas)
+    return False
+
+
+def apagar_nota(base_dir: str | Path, fundo_id: str, tipo: str, stem: str, nota_id: str) -> bool:
+    """Remove uma nota pelo ID."""
+    notas = carregar_notas(base_dir, fundo_id, tipo, stem)
+    notas = [n for n in notas if n["id"] != nota_id]
+    return salvar_notas(base_dir, fundo_id, tipo, stem, notas)
+
+
 def notas_existem(base_dir: str | Path, fundo_id: str, tipo: str, stem: str) -> bool:
     """Verifica se existem notas para um documento."""
-    base_dir = Path(base_dir)
-    path     = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.md"
-    return path.exists() and path.stat().st_size > 0
+    return len(carregar_notas(base_dir, fundo_id, tipo, stem)) > 0
+
+
+# ---------------------------------------------------------------------------
+# PARSE DE VERSÃO/DATA DO NOME DO ARQUIVO
+# ---------------------------------------------------------------------------
+
+def parsear_nome_arquivo(stem: str) -> dict:
+    """
+    Extrai versão e data do nome do arquivo.
+    Padrão: qualquer_nome_V1_01012026 ou qualquer_nome_V2_15032026
+
+    Returns:
+        {"nome_base": str, "versao": str|None, "data": str|None}
+    """
+    # Tenta extrair padrão _V{n}_{DDMMYYYY} no final
+    match = _re.search(r"_(V\d+)_(\d{8})$", stem, _re.IGNORECASE)
+    if match:
+        versao = match.group(1).upper()
+        data_raw = match.group(2)
+        try:
+            data_fmt = f"{data_raw[:2]}/{data_raw[2:4]}/{data_raw[4:]}"
+        except Exception:
+            data_fmt = data_raw
+        nome_base = stem[:match.start()]
+        return {"nome_base": nome_base, "versao": versao, "data": data_fmt}
+
+    # Tenta só _V{n} no final
+    match2 = _re.search(r"_(V\d+)$", stem, _re.IGNORECASE)
+    if match2:
+        versao    = match2.group(1).upper()
+        nome_base = stem[:match2.start()]
+        return {"nome_base": nome_base, "versao": versao, "data": None}
+
+    return {"nome_base": stem, "versao": None, "data": None}
