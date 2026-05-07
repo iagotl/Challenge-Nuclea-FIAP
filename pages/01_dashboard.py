@@ -156,6 +156,881 @@ def _sem_dados():
 
 
 
+
+# ---------------------------------------------------------------------------
+# ABA: COTAS
+# ---------------------------------------------------------------------------
+
+def _aba_cotas(dados: dict, metricas: dict):
+    oi   = dados["outras_informacoes"]
+    cra  = oi
+
+    col_t, col_h = st.columns([5, 1])
+    with col_t:
+        st.markdown("""
+        <div style="padding:20px 0 24px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.12em;
+                        text-transform:uppercase;color:#407b6e;margin-bottom:6px;">
+                Cotas · Estrutura de Subordinação
+            </div>
+            <div style="font-size:22px;font-weight:500;color:#fff;">
+                Rentabilidade, captações e perfil de cotistas
+            </div>
+        </div>""", unsafe_allow_html=True)
+    with col_h:
+        st.markdown("<div style='padding-top:24px;'>", unsafe_allow_html=True)
+        st.page_link("app.py", label="← Home", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.2);margin:0 0 24px;'>",
+                unsafe_allow_html=True)
+
+    # ── Cards por subclasse ──
+    _secao("subclasses", "Rentabilidade e valor da cota no mês")
+    pl_sub = metricas["cotas"]["pl_por_subclasse"]
+    cores_sub = {"Senior": "#4a9eff", "Mezanino 1": "#c8f55a", "Subordinada 1": "#ff5a4a"}
+
+    cols = st.columns(len(pl_sub)) if pl_sub else st.columns(1)
+    for col, sub in zip(cols, pl_sub):
+        rent  = sub["rentabilidade_pct"]
+        cor   = cores_sub.get(sub["tipo"], "#407b6e")
+        if rent is None:
+            cor_rent, sinal = "rgba(255,255,255,0.2)", "—"
+        elif rent > 0:
+            cor_rent, sinal = "#4adb8a", f"+{rent:.2f}%"
+        elif rent < 0:
+            cor_rent, sinal = "#ff5a4a", f"{rent:.2f}%"
+        else:
+            cor_rent, sinal = "rgba(255,255,255,0.3)", "0,00%"
+
+        with col:
+            st.markdown(f"""
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(64,123,110,0.18);
+                        border-top:2px solid {cor};border-radius:12px;padding:20px;height:100%;">
+                <div style="font-size:9px;font-family:'DM Mono',monospace;letter-spacing:0.12em;
+                            text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:4px;">
+                    {sub["tipo"]}
+                </div>
+                <div style="font-size:14px;font-weight:500;color:#fff;margin-bottom:16px;">
+                    {sub["serie"] or "Série única"}
+                </div>
+                <div style="font-size:32px;font-weight:500;font-family:'DM Mono',monospace;
+                            color:{cor_rent};line-height:1;margin-bottom:12px;">
+                    {sinal}
+                </div>
+                <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:12px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.35);font-family:'DM Mono',monospace;">
+                            Valor/cota
+                        </span>
+                        <span style="font-size:11px;color:#fff;font-family:'DM Mono',monospace;">
+                            R$ {sub["valor_cota"]:,.4f}
+                        </span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.35);font-family:'DM Mono',monospace;">
+                            Qtd. cotas
+                        </span>
+                        <span style="font-size:11px;color:#fff;font-family:'DM Mono',monospace;">
+                            {sub["quantidade_cotas"]:,.2f}
+                        </span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;">
+                        <span style="font-size:11px;color:rgba(255,255,255,0.35);font-family:'DM Mono',monospace;">
+                            PL subclasse
+                        </span>
+                        <span style="font-size:11px;color:{cor};font-weight:500;font-family:'DM Mono',monospace;">
+                            {_fmt_brl(sub["pl_subclasse"])}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin:28px 0 0;padding-top:28px;border-top:1px solid rgba(64,123,110,0.15);'></div>",
+                unsafe_allow_html=True)
+
+    # ── Captações / Resgates / Amortizações ──
+    _secao("movimentações", "Captações, resgates e amortizações no mês")
+    col_cap, col_resg, col_amort = st.columns(3)
+
+    def _tabela_mov(titulo, itens, col_val, col_qt, cor):
+        linhas = "".join([
+            f"""<tr>
+                <td style="padding:8px 10px;color:rgba(255,255,255,0.6);
+                           border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">
+                    {i["tipo"]}
+                </td>
+                <td style="padding:8px 10px;text-align:right;font-weight:500;
+                           color:{"#4adb8a" if i[col_val] > 0 else "rgba(255,255,255,0.2)"};
+                           border-bottom:1px solid rgba(255,255,255,0.04);
+                           font-size:12px;font-family:'DM Mono',monospace;">
+                    {_fmt_brl(i[col_val]) if i[col_val] > 0 else "—"}
+                </td>
+            </tr>"""
+            for i in itens
+        ])
+        return f"""
+        <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                    text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:10px;">
+            {titulo}
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+                <th style="text-align:left;padding:6px 10px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.2);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">Subclasse</th>
+                <th style="text-align:right;padding:6px 10px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.2);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">Valor</th>
+            </tr></thead>
+            <tbody>{linhas}</tbody>
+        </table>"""
+
+    with col_cap:
+        st.markdown(_tabela_mov("Captações", oi["captacoes"], "valor", "cotas", "#4adb8a"),
+                    unsafe_allow_html=True)
+    with col_resg:
+        st.markdown(_tabela_mov("Resgates", oi["resgates"], "valor", "cotas", "#ff5a4a"),
+                    unsafe_allow_html=True)
+    with col_amort:
+        st.markdown("""
+        <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                    text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:10px;">
+            Amortizações
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+                <th style="text-align:left;padding:6px 10px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.2);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">Subclasse</th>
+                <th style="text-align:right;padding:6px 10px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.2);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">Por cota</th>
+                <th style="text-align:right;padding:6px 10px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.2);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">Total</th>
+            </tr></thead>
+            <tbody>
+        """ + "".join([
+            f"""<tr>
+                <td style="padding:8px 10px;color:rgba(255,255,255,0.6);
+                           border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">
+                    {a["tipo"]}</td>
+                <td style="padding:8px 10px;text-align:right;font-family:'DM Mono',monospace;
+                           color:{"#f5a623" if a["valor_por_cota"] > 0 else "rgba(255,255,255,0.2)"};
+                           border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">
+                    {f"R$ {a['valor_por_cota']:,.2f}" if a["valor_por_cota"] > 0 else "—"}</td>
+                <td style="padding:8px 10px;text-align:right;font-family:'DM Mono',monospace;
+                           color:{"#f5a623" if a["valor_total"] > 0 else "rgba(255,255,255,0.2)"};
+                           border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;font-weight:500;">
+                    {_fmt_brl(a["valor_total"]) if a["valor_total"] > 0 else "—"}</td>
+            </tr>"""
+            for a in oi["amortizacoes"]
+        ]) + "</tbody></table>", unsafe_allow_html=True)
+
+    st.markdown("<div style='margin:28px 0 0;padding-top:28px;border-top:1px solid rgba(64,123,110,0.15);'></div>",
+                unsafe_allow_html=True)
+
+    # ── Perfil de cotistas ──
+    _secao("cotistas", "Perfil dos investidores")
+    perf = oi["perfil_cotistas"]
+    total_cot = oi["estrutura_cotas"]["total_cotistas"]
+
+    col_p1, col_p2 = st.columns(2)
+    for col, (tipo, dados_perf) in zip([col_p1, col_p2],
+                                        [("Sênior", perf.get("senior", {})),
+                                         ("Subordinado (Mezanino + Junior)", perf.get("subordinado", {}))]):
+        with col:
+            tipos_inv = [
+                ("Pessoa Física",       dados_perf.get("pessoa_fisica", 0),        "#c8f55a"),
+                ("Pessoa Jurídica",     dados_perf.get("pessoa_juridica", 0),      "#4a9eff"),
+                ("Banco Comercial",     dados_perf.get("banco_comercial", 0),      "#f5a623"),
+                ("Corretora/Distrib.",  dados_perf.get("corretora", 0),            "#407b6e"),
+                ("Outras PJ Fin.",      dados_perf.get("outras_pj_financeiras", 0),"#4adb8a"),
+                ("Não Residentes",      dados_perf.get("nao_residentes", 0),       "#a78bfa"),
+                ("Outros Fundos",       dados_perf.get("outros_fundos", 0),        "#fb923c"),
+                ("Outros",              dados_perf.get("outros", 0),               "#94a3b8"),
+            ]
+            tipos_ativos = [(n, v, c) for n, v, c in tipos_inv if v > 0]
+            total_tipo   = sum(v for _, v, _ in tipos_ativos)
+
+            st.markdown(f"""
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                        text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:12px;">
+                {tipo}
+            </div>
+            """, unsafe_allow_html=True)
+
+            if not tipos_ativos:
+                st.markdown("""
+                <div style="font-size:12px;font-family:'DM Mono',monospace;
+                            color:rgba(255,255,255,0.2);padding:16px 0;">
+                    Nenhum cotista nesta subclasse.
+                </div>""", unsafe_allow_html=True)
+            else:
+                for nome, valor, cor in tipos_ativos:
+                    pct = round(valor / total_tipo * 100, 1) if total_tipo > 0 else 0
+                    st.markdown(f"""
+                    <div style="margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;
+                                    font-size:11px;font-family:'DM Mono',monospace;margin-bottom:4px;">
+                            <span style="color:rgba(255,255,255,0.6);">{nome}</span>
+                            <span style="color:{cor};font-weight:500;">{valor} ({pct:.0f}%)</span>
+                        </div>
+                        <div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+                            <div style="height:100%;width:{pct}%;background:{cor};border-radius:3px;"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# ABA: RISCO DE CRÉDITO
+# ---------------------------------------------------------------------------
+
+def _aba_risco(dados: dict, metricas: dict):
+    scr = metricas["scr"]
+    gar = dados["outras_informacoes"]["garantias"]
+
+    col_t, col_h = st.columns([5, 1])
+    with col_t:
+        st.markdown("""
+        <div style="padding:20px 0 24px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.12em;
+                        text-transform:uppercase;color:#407b6e;margin-bottom:6px;">
+                Risco de Crédito · SCR Bacen
+            </div>
+            <div style="font-size:22px;font-weight:500;color:#fff;">
+                Qualidade da carteira e garantias vinculadas
+            </div>
+        </div>""", unsafe_allow_html=True)
+    with col_h:
+        st.markdown("<div style='padding-top:24px;'>", unsafe_allow_html=True)
+        st.page_link("app.py", label="← Home", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.2);margin:0 0 24px;'>",
+                unsafe_allow_html=True)
+
+    # ── KPIs ──
+    cor_baixo = "#4adb8a" if scr["pct_baixo_risco"] > 60 else "#f5a623"
+    cor_atenc  = "#f5a623" if scr["pct_atencao"] < 40 else "#ff5a4a"
+    cor_alto   = "#4adb8a" if scr["pct_alto_risco"] == 0 else "#ff5a4a"
+
+    kpis = [
+        ("Carteira Total (SCR)",  _fmt_brl(scr["total"]),              "Base de classificação Bacen",                  "#fff"),
+        ("Baixo Risco (AA + A)",  f"{scr['pct_baixo_risco']:.1f}%",   f"{_fmt_brl(scr['total'] * scr['pct_baixo_risco'] / 100)}", cor_baixo),
+        ("Em Atenção (B + C)",    f"{scr['pct_atencao']:.1f}%",       f"{_fmt_brl(scr['total'] * scr['pct_atencao'] / 100)}",    cor_atenc),
+        ("Alto Risco (D–H)",      f"{scr['pct_alto_risco']:.1f}%",    "Faixas de perda esperada",                     cor_alto),
+    ]
+    cols = st.columns(4)
+    for col, (label, valor, sub, cor) in zip(cols, kpis):
+        with col:
+            st.markdown(_kpi(label, valor, sub, cor), unsafe_allow_html=True)
+
+    st.markdown("<div style='margin:28px 0 0;padding-top:28px;border-top:1px solid rgba(64,123,110,0.15);'></div>",
+                unsafe_allow_html=True)
+
+    # ── Gráficos SCR ──
+    _secao("classificação scr", "Rating por devedor e por operação")
+    col_dev, col_op = st.columns(2)
+
+    CORES_RATING = {
+        "AA": "#4adb8a", "A": "#4adb8a",
+        "B":  "#4a9eff",
+        "C":  "#f5a623",
+        "D":  "#ff5a4a", "E": "#ff5a4a",
+        "F":  "#ff5a4a", "G": "#ff5a4a", "H": "#ff5a4a",
+    }
+
+    scr_bacen    = dados["outras_informacoes"]["scr_bacen"]
+    todos_ratings = ["AA", "A", "B", "C", "D", "E", "F", "G", "H"]
+
+    def _grafico_scr(titulo, por_rating_dict):
+        ratings = todos_ratings
+        valores  = [por_rating_dict.get(r, 0) for r in ratings]
+        cores_r  = [CORES_RATING[r] for r in ratings]
+        total    = sum(valores) or 1
+        pcts     = [v / total * 100 for v in valores]
+
+        fig = go.Figure(go.Bar(
+            x=ratings, y=valores,
+            marker=dict(color=cores_r, line=dict(color="#0d1415", width=1)),
+            text=[f"{p:.1f}%" if v > 0 else "" for v, p in zip(valores, pcts)],
+            textposition="outside",
+            textfont=dict(family="DM Mono", size=11, color="rgba(255,255,255,0.6)"),
+            hovertemplate="<b>Rating %{x}</b><br>R$ %{y:,.2f}<extra></extra>",
+        ))
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(t=30, b=10, l=0, r=0),
+            height=260,
+            showlegend=False,
+            title=dict(text=titulo, font=dict(family="DM Mono", size=11,
+                       color="rgba(255,255,255,0.4)"), x=0),
+            xaxis=dict(tickfont=dict(family="DM Mono", size=11, color="rgba(255,255,255,0.5)"),
+                       gridcolor="rgba(255,255,255,0.04)"),
+            yaxis=dict(tickfont=dict(family="DM Mono", size=10, color="rgba(255,255,255,0.3)"),
+                       gridcolor="rgba(255,255,255,0.04)", tickformat=",.0f"),
+            bargap=0.35,
+        )
+        return fig
+
+    with col_dev:
+        st.plotly_chart(
+            _grafico_scr("Por risco do devedor", scr_bacen["por_devedor"]),
+            use_container_width=True, config={"displayModeBar": False}
+        )
+    with col_op:
+        st.plotly_chart(
+            _grafico_scr("Por risco da operação", scr_bacen["por_operacao"]),
+            use_container_width=True, config={"displayModeBar": False}
+        )
+
+    # Legenda
+    st.markdown("""
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;font-family:'DM Mono',monospace;
+                color:rgba(255,255,255,0.4);margin-top:-8px;margin-bottom:4px;">
+        <span style="display:flex;align-items:center;gap:5px;">
+            <span style="width:10px;height:10px;border-radius:2px;background:#4adb8a;display:inline-block;"></span>
+            AA / A — Baixo risco
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+            <span style="width:10px;height:10px;border-radius:2px;background:#4a9eff;display:inline-block;"></span>
+            B — Risco aceitável
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+            <span style="width:10px;height:10px;border-radius:2px;background:#f5a623;display:inline-block;"></span>
+            C — Atenção
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+            <span style="width:10px;height:10px;border-radius:2px;background:#ff5a4a;display:inline-block;"></span>
+            D–H — Alto risco / Perda
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin:28px 0 0;padding-top:28px;border-top:1px solid rgba(64,123,110,0.15);'></div>",
+                unsafe_allow_html=True)
+
+    # ── Garantias ──
+    _secao("garantias", "Garantias vinculadas à carteira")
+    col_g1, col_g2, _ = st.columns([1, 1, 2])
+    with col_g1:
+        cor_g = "#4adb8a" if gar["valor_total"] > 0 else "rgba(255,255,255,0.2)"
+        st.markdown(_kpi("Valor Total das Garantias",
+                         _fmt_brl(gar["valor_total"]),
+                         "Vinculadas aos direitos creditórios", cor_g),
+                    unsafe_allow_html=True)
+    with col_g2:
+        st.markdown(_kpi("% com Garantia",
+                         f"{gar['percentual_pct']:.1f}%",
+                         "Dos direitos creditórios totais",
+                         "#4adb8a" if gar["percentual_pct"] > 0 else "rgba(255,255,255,0.2)"),
+                    unsafe_allow_html=True)
+
+    if gar["valor_total"] == 0:
+        st.markdown("""
+        <div style="display:flex;gap:12px;padding:12px 14px;border-radius:8px;margin-top:16px;
+                    background:rgba(255,90,74,0.08);border-left:3px solid #ff5a4a;">
+            <span style="color:#ff5a4a;font-size:10px;margin-top:2px;">●</span>
+            <div>
+                <div style="font-size:13px;font-weight:500;color:#fff;margin-bottom:2px;">
+                    Carteira sem garantias vinculadas
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">
+                    Em caso de inadimplência, a recuperação depende exclusivamente
+                    da cobrança direta dos devedores. Não há proteção adicional.
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Alertas SCR ──
+    if scr["pct_alto_risco"] == 0:
+        st.markdown("""
+        <div style="display:flex;gap:12px;padding:12px 14px;border-radius:8px;margin-top:12px;
+                    background:rgba(74,219,138,0.08);border-left:3px solid #4adb8a;">
+            <span style="color:#4adb8a;font-size:10px;margin-top:2px;">●</span>
+            <div>
+                <div style="font-size:13px;font-weight:500;color:#fff;margin-bottom:2px;">
+                    Nenhum crédito em faixa de alto risco (D–H)
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">
+                    As faixas de perda esperada estão zeradas. Sinal positivo de qualidade mínima da carteira.
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if scr["pct_atencao"] > 30:
+        st.markdown(f"""
+        <div style="display:flex;gap:12px;padding:12px 14px;border-radius:8px;margin-top:8px;
+                    background:rgba(245,166,35,0.08);border-left:3px solid #f5a623;">
+            <span style="color:#f5a623;font-size:10px;margin-top:2px;">●</span>
+            <div>
+                <div style="font-size:13px;font-weight:500;color:#fff;margin-bottom:2px;">
+                    {scr["pct_atencao"]:.0f}% da carteira em rating C — monitorar migração
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">
+                    Rating C indica risco em atenção. Acompanhar se esses créditos migram
+                    para D nas próximas competências.
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# ABA: CEDENTES
+# ---------------------------------------------------------------------------
+
+def _aba_cedentes(dados: dict, metricas: dict):
+    conc = metricas["cedentes"]
+    rtc  = dados["outras_informacoes"]["regularidade_fiscal_cedentes"]
+
+    col_t, col_h = st.columns([5, 1])
+    with col_t:
+        st.markdown("""
+        <div style="padding:20px 0 24px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.12em;
+                        text-transform:uppercase;color:#407b6e;margin-bottom:6px;">
+                Cedentes · Concentração e Regularidade
+            </div>
+            <div style="font-size:22px;font-weight:500;color:#fff;">
+                Análise de concentração e regularidade fiscal
+            </div>
+        </div>""", unsafe_allow_html=True)
+    with col_h:
+        st.markdown("<div style='padding-top:24px;'>", unsafe_allow_html=True)
+        st.page_link("app.py", label="← Home", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.2);margin:0 0 24px;'>",
+                unsafe_allow_html=True)
+
+    # ── KPIs ──
+    maior  = conc["maior_concentracao_pct"]
+    nivel  = conc["nivel_geral"]
+    total_d= conc["total_declarados"]
+    divida = rtc["total_divida_ativa"]
+
+    cores_nivel = {"critico": "#ff5a4a", "alto": "#ff5a4a", "moderado": "#f5a623", "baixo": "#4adb8a"}
+    cor_nivel   = cores_nivel.get(nivel, "#fff")
+    cor_divida  = "#4adb8a" if divida == 0 else "#ff5a4a"
+
+    kpis = [
+        ("Maior Concentração",    f"{maior:.1f}%",           f"Nível: {nivel.upper()}",                        cor_nivel),
+        ("Cedentes Declarados",   str(total_d),              "Participação > 10% do PL (obrigatório CVM)",    "#fff"),
+        ("Débitos em Dívida Ativa", _fmt_brl(divida),        "Total cedentes com débito tributário federal",  cor_divida),
+        ("Recuperação Judicial",  _fmt_brl(dados["ativo"]["dc_com_aquis"]["recuperacao_judicial"]),
+                                                              "Créditos de empresas em recuperação",
+                                   "#4adb8a" if dados["ativo"]["dc_com_aquis"]["recuperacao_judicial"] == 0 else "#ff5a4a"),
+    ]
+    cols = st.columns(4)
+    for col, (label, valor, sub, cor) in zip(cols, kpis):
+        with col:
+            st.markdown(_kpi(label, valor, sub, cor), unsafe_allow_html=True)
+
+    st.markdown("<div style='margin:28px 0 0;padding-top:28px;border-top:1px solid rgba(64,123,110,0.15);'></div>",
+                unsafe_allow_html=True)
+
+    # ── Concentração visual ──
+    _secao("concentração", "Participação dos cedentes no PL")
+    col_bar_c, col_info = st.columns([2, 1])
+
+    with col_bar_c:
+        outros_pct = max(0, 100 - maior)
+        cores_conc = [cor_nivel, "rgba(255,255,255,0.1)"]
+
+        fig = go.Figure(go.Bar(
+            x=["Cedente principal (" + (conc['cedentes'][0]['cpf_cnpj'] if conc['cedentes'] else 'N/D') + ")",
+               "Demais cedentes"],
+            y=[maior, outros_pct],
+            marker=dict(color=cores_conc, line=dict(color="#0d1415", width=1)),
+            text=[f"{maior:.1f}%", f"{outros_pct:.1f}%"],
+            textposition="outside",
+            textfont=dict(family="DM Mono", size=12, color="rgba(255,255,255,0.6)"),
+            hovertemplate="<b>%{x}</b><br>%{y:.1f}%<extra></extra>",
+        ))
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(t=30, b=10, l=0, r=0),
+            height=240,
+            showlegend=False,
+            xaxis=dict(tickfont=dict(family="DM Mono", size=11, color="rgba(255,255,255,0.5)"),
+                       gridcolor="rgba(255,255,255,0.04)"),
+            yaxis=dict(tickfont=dict(family="DM Mono", size=10, color="rgba(255,255,255,0.3)"),
+                       gridcolor="rgba(255,255,255,0.04)", ticksuffix="%", range=[0, 110]),
+            bargap=0.5,
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    with col_info:
+        st.markdown(f"""
+        <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                    text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:12px;">
+            Threshold CVM
+        </div>
+        """, unsafe_allow_html=True)
+
+        for threshold, label, cor_t in [
+            (10,  "> 10% · Declaração obrigatória", "#f5a623"),
+            (25,  "> 25% · Concentração alta",       "#ff5a4a"),
+            (40,  "> 40% · Concentração crítica",    "#ff5a4a"),
+        ]:
+            ativo = maior >= threshold
+            st.markdown(f"""
+            <div style="display:flex;align-items:center;gap:10px;padding:10px;
+                        background:{"rgba(255,90,74,0.08)" if ativo else "rgba(255,255,255,0.02)"};
+                        border:1px solid {"rgba(255,90,74,0.25)" if ativo else "rgba(255,255,255,0.06)"};
+                        border-radius:8px;margin-bottom:8px;">
+                <span style="font-size:14px;">{"🔴" if ativo else "⚪"}</span>
+                <div>
+                    <div style="font-size:11px;font-family:'DM Mono',monospace;
+                                color:{"#ff5a4a" if ativo else "rgba(255,255,255,0.3)"};">
+                        {label}
+                    </div>
+                    <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:2px;">
+                        {"ATINGIDO" if ativo else "não atingido"}
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin:28px 0 0;padding-top:28px;border-top:1px solid rgba(64,123,110,0.15);'></div>",
+                unsafe_allow_html=True)
+
+    # ── Tabela de cedentes ──
+    _secao("cedentes declarados", "Cedentes com participação > 10% do PL")
+    if conc["cedentes"]:
+        linhas = "".join([
+            f"""<tr>
+                <td style="padding:10px 12px;color:rgba(255,255,255,0.7);
+                           border-bottom:1px solid rgba(255,255,255,0.04);font-family:'DM Mono',monospace;">
+                    {c["cpf_cnpj"]}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:500;
+                           color:{cores_nivel.get(c["nivel"], "#fff")};
+                           border-bottom:1px solid rgba(255,255,255,0.04);
+                           font-family:'DM Mono',monospace;">
+                    {c["participacao_pct"]:.1f}%</td>
+                <td style="padding:10px 12px;text-align:center;
+                           border-bottom:1px solid rgba(255,255,255,0.04);">
+                    <span style="font-size:10px;font-family:'DM Mono',monospace;padding:2px 10px;
+                                 border-radius:10px;background:{cores_nivel.get(c["nivel"], "#407b6e")}22;
+                                 color:{cores_nivel.get(c["nivel"], "#407b6e")};
+                                 border:1px solid {cores_nivel.get(c["nivel"], "#407b6e")}44;">
+                        {c["nivel"].upper()}
+                    </span>
+                </td>
+            </tr>"""
+            for c in conc["cedentes"]
+        ])
+        st.markdown(f"""
+        <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+                <th style="text-align:left;padding:8px 12px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.25);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">CPF / CNPJ</th>
+                <th style="text-align:right;padding:8px 12px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.25);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">Participação no PL</th>
+                <th style="text-align:center;padding:8px 12px;font-size:10px;letter-spacing:0.08em;
+                           text-transform:uppercase;color:rgba(255,255,255,0.25);
+                           border-bottom:1px solid rgba(64,123,110,0.2);">Nível</th>
+            </tr></thead>
+            <tbody>{linhas}</tbody>
+        </table>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="font-size:12px;font-family:'DM Mono',monospace;
+                    color:rgba(255,255,255,0.2);padding:20px 0;">
+            Nenhum cedente com participação > 10% declarado.
+        </div>""", unsafe_allow_html=True)
+
+    # ── Regularidade fiscal ──
+    if divida == 0:
+        st.markdown("""
+        <div style="display:flex;gap:12px;padding:12px 14px;border-radius:8px;margin-top:16px;
+                    background:rgba(74,219,138,0.08);border-left:3px solid #4adb8a;">
+            <span style="color:#4adb8a;font-size:10px;margin-top:2px;">●</span>
+            <div>
+                <div style="font-size:13px;font-weight:500;color:#fff;margin-bottom:2px;">
+                    Cedentes com regularidade fiscal
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">
+                    Nenhum cedente possui débitos inscritos em Dívida Ativa da União.
+                </div>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# ABA: RELATÓRIOS
+# ---------------------------------------------------------------------------
+
+def _aba_relatorios(dados: dict, metricas: dict, fundo_id: str, competencia: str):
+    from core.loader import carregar_insight
+
+    cab = dados["cabecalho"]
+    at  = dados["ativo"]
+    pl  = dados["patrimonio_liquido"]
+
+    col_t, col_h = st.columns([5, 1])
+    with col_t:
+        st.markdown(f"""
+        <div style="padding:20px 0 24px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.12em;
+                        text-transform:uppercase;color:#407b6e;margin-bottom:6px;">
+                Relatórios · {cab["competencia"]}
+            </div>
+            <div style="font-size:22px;font-weight:500;color:#fff;">
+                Resumo executivo e dados completos
+            </div>
+        </div>""", unsafe_allow_html=True)
+    with col_h:
+        st.markdown("<div style='padding-top:24px;'>", unsafe_allow_html=True)
+        st.page_link("app.py", label="← Home", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.2);margin:0 0 24px;'>",
+                unsafe_allow_html=True)
+
+    # ── Insights (markdown externo) ──
+    _secao("análise", "Insights da competência")
+    insight_md = carregar_insight(BASE_DIR, fundo_id, competencia)
+
+    if insight_md:
+        # Remove o frontmatter YAML
+        linhas = insight_md.split("\n")
+        if linhas[0].strip() == "---":
+            fim = next((i for i, l in enumerate(linhas[1:], 1) if l.strip() == "---"), None)
+            if fim:
+                linhas = linhas[fim + 1:]
+        insight_limpo = "\n".join(linhas).strip()
+
+        # Converte markdown para HTML com cores controladas
+        import re
+
+        def _md_to_html(md: str) -> str:
+            html = []
+            lines = md.split("\n")
+            in_list = False
+            in_table = False
+            table_rows = []
+
+            def _inline(text):
+                # Negrito+itálico
+                text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text)
+                # Negrito
+                text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+                # Itálico
+                text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
+                return text
+
+            def _flush_table():
+                if not table_rows:
+                    return ""
+                out = '<table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0;">'
+                for ri, row in enumerate(table_rows):
+                    cells = [c.strip() for c in row.strip("|").split("|")]
+                    if ri == 0:
+                        out += "<thead><tr>" + "".join(
+                            f'<th style="text-align:left;padding:8px 12px;font-size:10px;'
+                            f'letter-spacing:0.08em;text-transform:uppercase;'
+                            f'color:rgba(255,255,255,0.35);border-bottom:1px solid rgba(64,123,110,0.25);">{c}</th>'
+                            for c in cells
+                        ) + "</tr></thead><tbody>"
+                    elif re.match(r'[\s|:-]+$', row.replace("|","")):
+                        continue
+                    else:
+                        out += "<tr>" + "".join(
+                            f'<td style="padding:8px 12px;color:rgba(255,255,255,0.75);'
+                            f'border-bottom:1px solid rgba(255,255,255,0.05);">{_inline(c)}</td>'
+                            for c in cells
+                        ) + "</tr>"
+                out += "</tbody></table>"
+                return out
+
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+
+                # Separador HR
+                if re.match(r'^---+$', line.strip()):
+                    if in_list:
+                        html.append("</ul>")
+                        in_list = False
+                    if in_table:
+                        html.append(_flush_table())
+                        table_rows = []
+                        in_table = False
+                    html.append('<hr style="border:none;border-top:1px solid rgba(64,123,110,0.2);margin:20px 0;">')
+                    i += 1
+                    continue
+
+                # Tabela
+                if line.strip().startswith("|"):
+                    if in_list:
+                        html.append("</ul>")
+                        in_list = False
+                    in_table = True
+                    table_rows.append(line)
+                    i += 1
+                    continue
+                elif in_table:
+                    html.append(_flush_table())
+                    table_rows = []
+                    in_table = False
+
+                # Título H2
+                if line.startswith("## "):
+                    if in_list:
+                        html.append("</ul>")
+                        in_list = False
+                    text = _inline(line[3:].strip())
+                    html.append(
+                        f'<h2 style="font-size:24px;font-weight:500;color:#407b6e;'
+                        f'margin:28px 0 10px;padding-bottom:8px;'
+                        f'border-bottom:1px solid rgba(64,123,110,0.2);">{text}</h2>'
+                    )
+                    i += 1
+                    continue
+
+                # Título H3
+                if line.startswith("### "):
+                    if in_list:
+                        html.append("</ul>")
+                        in_list = False
+                    text = _inline(line[4:].strip())
+                    html.append(f'<h3 style="font-size:16px;font-weight:500;color:#407b6e;margin:20px 0 8px;">{text}</h3>')
+                    i += 1
+                    continue
+
+                # Lista
+                if re.match(r'^[-*] ', line):
+                    if not in_list:
+                        html.append('<ul style="margin:8px 0 12px;padding-left:20px;">')
+                        in_list = True
+                    text = _inline(line[2:].strip())
+                    html.append(f'<li style="color:#ffffff;font-size:14px;line-height:1.8;margin-bottom:4px;">{text}</li>')
+                    i += 1
+                    continue
+                elif in_list:
+                    html.append("</ul>")
+                    in_list = False
+
+                # Linha em branco
+                if not line.strip():
+                    i += 1
+                    continue
+
+                # Parágrafo normal
+                text = _inline(line.strip())
+                html.append(f'<p style="color:#ffffff;font-size:14px;line-height:1.8;margin:0 0 10px;">{text}</p>')
+                i += 1
+
+            if in_list:
+                html.append("</ul>")
+            if in_table:
+                html.append(_flush_table())
+
+            return "\n".join(html)
+
+        html_insight = _md_to_html(insight_limpo)
+        st.markdown(
+            f'''<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(64,123,110,0.2);
+                        border-radius:12px;padding:24px 28px;margin-bottom:24px;">
+                {html_insight}
+            </div>''',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(f"""
+        <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(64,123,110,0.25);
+                    border-radius:12px;padding:32px;text-align:center;margin-bottom:24px;">
+            <div style="font-size:13px;font-family:'DM Mono',monospace;
+                        color:rgba(255,255,255,0.2);margin-bottom:6px;">
+                Nenhum insight disponível para {competencia}
+            </div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.15);">
+                Adicione um arquivo em data/funds/{fundo_id}/insights/{competencia.replace("/", "-")[:7]}.md
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin:28px 0 0;padding-top:28px;border-top:1px solid rgba(64,123,110,0.15);'></div>",
+                unsafe_allow_html=True)
+
+    # ── Tabela completa ──
+    _secao("dados completos", "Todos os indicadores do informe")
+
+    passivo = dados["passivo"]["total"]
+    dc      = at["dc_com_aquis"]
+
+    secoes = [
+        ("I · Patrimônio e Balanço", [
+            ("Ativo Total",             _fmt_brl(at["ativo_total"])),
+            ("Disponibilidades",        _fmt_brl(at["disponibilidades"])),
+            ("Carteira de Créditos",    _fmt_brl(dc["total"])),
+            ("Títulos Públicos Federais", _fmt_brl(at["titulos_publicos_federais"])),
+            ("Passivo Total",           _fmt_brl(passivo)),
+            ("Patrimônio Líquido",      _fmt_brl(pl["pl"])),
+            ("PL Médio 3 meses",        _fmt_brl(pl["pl_medio_3m"])),
+        ]),
+        ("II · Carteira de Créditos", [
+            ("Créditos Adimplentes",    _fmt_brl(dc["a_vencer_adimplentes"])),
+            ("Créditos Inadimplentes",  _fmt_brl(dc["existentes_inadimplentes"])),
+            ("Provisão para Perdas",    _fmt_brl(dc["provisao_perda"])),
+            ("A Performar",             _fmt_brl(dc["a_performar"])),
+            ("Recuperação Judicial",    _fmt_brl(dc["recuperacao_judicial"])),
+            ("Ações Judiciais",         _fmt_brl(dc["acoes_judiciais"])),
+        ]),
+        ("III · Cotas e Rentabilidade", [
+            (f"{r['tipo']} — Rentabilidade", f"{r['rentabilidade_pct']:.2f}%")
+            for r in dados["outras_informacoes"]["rentabilidade"]
+        ] + [
+            (f"{c['tipo']} — Valor/cota", f"R$ {c['valor_cota']:,.4f}")
+            for c in dados["outras_informacoes"]["descricao_classes"]
+        ]),
+        ("IV · SCR Bacen (por devedor)", [
+            (f"Rating {r}", _fmt_brl(v))
+            for r, v in dados["outras_informacoes"]["scr_bacen"]["por_devedor"].items()
+            if v > 0
+        ]),
+    ]
+
+    col_s1, col_s2 = st.columns(2)
+    for i, (titulo_sec, itens) in enumerate(secoes):
+        with (col_s1 if i % 2 == 0 else col_s2):
+            linhas_tab = "".join([
+                f"""<tr>
+                    <td style="padding:8px 12px;color:rgba(255,255,255,0.55);
+                               border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">{n}</td>
+                    <td style="padding:8px 12px;text-align:right;font-weight:500;
+                               color:#fff;border-bottom:1px solid rgba(255,255,255,0.04);
+                               font-size:12px;font-family:'DM Mono',monospace;">{v}</td>
+                </tr>"""
+                for n, v in itens
+            ])
+            st.markdown(f"""
+            <div style="margin-bottom:20px;">
+                <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                            text-transform:uppercase;color:rgba(255,255,255,0.3);
+                            margin-bottom:10px;padding-bottom:8px;
+                            border-bottom:1px solid rgba(64,123,110,0.2);">
+                    {titulo_sec}
+                </div>
+                <table style="width:100%;border-collapse:collapse;">
+                    <tbody>{linhas_tab}</tbody>
+                </table>
+            </div>
+            """, unsafe_allow_html=True)
+
 # ---------------------------------------------------------------------------
 # ABA: INADIMPLÊNCIA
 # ---------------------------------------------------------------------------
@@ -909,6 +1784,9 @@ def main():
         "aquisicoes_total": neg["aquisicoes"]["total"]["valor"],
     }
 
+    fundo_id    = fundo_id
+    competencia = competencia
+
     # ── Abas ──
     abas = st.tabs([
         "Painel Geral",
@@ -928,17 +1806,14 @@ def main():
 
     with abas[2]:
         _aba_inadimplencia(dados, metricas)
-
-    for i, nome in enumerate(["Cotas",
-                               "Risco de Crédito", "Cedentes", "Relatórios"], start=3):
-        with abas[i]:
-            st.markdown(f"""
-            <div style="text-align:center;padding:60px 0;color:rgba(255,255,255,0.2);">
-                <div style="font-size:13px;font-family:'DM Mono',monospace;">
-                    Aba <b style="color:#407b6e;">{nome}</b> — em construção
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+    with abas[3]:
+        _aba_cotas(dados, metricas)
+    with abas[4]:
+        _aba_risco(dados, metricas)
+    with abas[5]:
+        _aba_cedentes(dados, metricas)
+    with abas[6]:
+        _aba_relatorios(dados, metricas, fundo_id, competencia)
 
 
 if __name__ == "__main__":
