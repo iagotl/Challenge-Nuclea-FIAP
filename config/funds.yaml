@@ -1,10 +1,10 @@
 funds:
   - id: xama
-    nome: "XAMA! FIDC Não-Padronizado"
+    nome: "XAMA! FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS NÃO-PADRONIZADOS"
     cnpj: "47669160000191"
     ativo: true
 
-  - id: fundo_b
-    nome: "Nome do Fundo B"
-    cnpj: "00000000000000"
+  - id: Kinea
+    nome: "FUNDO DE INVESTIMENTO EM DIREITOS CREDITÓRIOS KINEA CRÉDITO ESTRUTURADO RESPONSABILIDADE LIMITADA"
+    cnpj: "60431592000128"
     ativo: true
