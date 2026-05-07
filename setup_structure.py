@@ -27,27 +27,24 @@ FILES = [
     "data/funds/xama/informes/inbox/.gitkeep",
     "data/funds/xama/informes/processed/.gitkeep",
     "data/funds/xama/informes/cache/.gitkeep",
-    "data/funds/xama/documentos/inbox/.gitkeep",
-    "data/funds/xama/documentos/processed/.gitkeep",
-    "data/funds/xama/documentos/cache/.gitkeep",
+    "data/funds/xama/documentos/regulamento/.gitkeep",
+    "data/funds/xama/documentos/assembleias/.gitkeep",
 
     # --- Dados: Fundo B ---
     "data/funds/fundo_b/insights/.gitkeep",
     "data/funds/fundo_b/informes/inbox/.gitkeep",
     "data/funds/fundo_b/informes/processed/.gitkeep",
     "data/funds/fundo_b/informes/cache/.gitkeep",
-    "data/funds/fundo_b/documentos/inbox/.gitkeep",
-    "data/funds/fundo_b/documentos/processed/.gitkeep",
-    "data/funds/fundo_b/documentos/cache/.gitkeep",
+    "data/funds/fundo_b/documentos/regulamento/.gitkeep",
+    "data/funds/fundo_b/documentos/assembleias/.gitkeep",
 
     # --- Dados: Fundo C ---
     "data/funds/fundo_c/insights/.gitkeep",
     "data/funds/fundo_c/informes/inbox/.gitkeep",
     "data/funds/fundo_c/informes/processed/.gitkeep",
     "data/funds/fundo_c/informes/cache/.gitkeep",
-    "data/funds/fundo_c/documentos/inbox/.gitkeep",
-    "data/funds/fundo_c/documentos/processed/.gitkeep",
-    "data/funds/fundo_c/documentos/cache/.gitkeep",
+    "data/funds/fundo_c/documentos/regulamento/.gitkeep",
+    "data/funds/fundo_c/documentos/assembleias/.gitkeep",
 
     # --- Core (lógica de negócio, independente do Streamlit) ---
     "core/__init__.py",

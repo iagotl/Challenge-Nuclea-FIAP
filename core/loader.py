@@ -237,3 +237,96 @@ def listar_insights_disponiveis(base_dir: str | Path, fundo_id: str) -> list[str
 
     competencias.sort(key=_competencia_para_chave, reverse=True)
     return competencias
+
+
+# ---------------------------------------------------------------------------
+# DOCUMENTOS
+# ---------------------------------------------------------------------------
+
+# Tipos de documentos suportados e seus labels
+TIPOS_DOCUMENTO = {
+    "regulamento":  "Regulamento",
+    "assembleias":  "Assembleias",
+}
+
+
+def listar_documentos(base_dir: str | Path, fundo_id: str) -> dict[str, list[dict]]:
+    """
+    Lista todos os documentos disponíveis de um fundo, organizados por tipo.
+
+    Returns:
+        Dict com tipo como chave e lista de documentos como valor.
+        Ex:
+        {
+            "regulamento": [
+                {"nome": "regulamento.pdf", "path": Path(...), "tem_insight": True}
+            ],
+            "assembleias": [
+                {"nome": "assembleia-2026-03.pdf", "path": Path(...), "tem_insight": False}
+            ]
+        }
+    """
+    base_dir  = Path(base_dir)
+    docs_root = base_dir / "data" / "funds" / fundo_id / "documentos"
+    resultado = {}
+
+    for tipo, label in TIPOS_DOCUMENTO.items():
+        tipo_dir = docs_root / tipo
+        if not tipo_dir.exists():
+            resultado[tipo] = []
+            continue
+
+        pdfs = sorted(tipo_dir.glob("*.pdf"), reverse=True)
+        resultado[tipo] = [
+            {
+                "nome":        pdf.name,
+                "stem":        pdf.stem,
+                "path":        pdf,
+                "tipo":        tipo,
+                "label":       label,
+                "tem_insight": (tipo_dir / f"{pdf.stem}.md").exists(),
+            }
+            for pdf in pdfs
+        ]
+
+    return resultado
+
+
+def carregar_documento_insight(base_dir: str | Path, fundo_id: str, tipo: str, stem: str) -> str | None:
+    """
+    Carrega o insight (.md) de um documento específico.
+
+    Args:
+        base_dir:  Raiz do projeto
+        fundo_id:  ID do fundo
+        tipo:      Tipo do documento ('regulamento', 'assembleias')
+        stem:      Nome do arquivo sem extensão (ex: 'regulamento', 'assembleia-2026-03')
+
+    Returns:
+        Conteúdo do markdown ou None se não existir.
+    """
+    base_dir  = Path(base_dir)
+    md_path   = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.md"
+
+    if not md_path.exists():
+        return None
+
+    try:
+        return md_path.read_text(encoding="utf-8")
+    except Exception as e:
+        log.error(f"Erro ao ler insight de documento {md_path}: {e}")
+        return None
+
+
+def carregar_pdf_bytes(pdf_path: Path) -> bytes | None:
+    """
+    Lê um PDF e retorna seus bytes para renderização no Streamlit.
+
+    Returns:
+        Bytes do PDF ou None se não encontrado.
+    """
+    try:
+        return pdf_path.read_bytes()
+    except Exception as e:
+        log.error(f"Erro ao ler PDF {pdf_path}: {e}")
+        return None
