@@ -313,26 +313,25 @@ def _tela_home(usuario: dict):
     ICON_DOC = '''<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#407b6e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
       <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
-      <line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
     </svg>'''
     ICON_PREC = '''<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#407b6e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
     </svg>'''
 
     cards = [
-        (ICON_DASH, "Dashboard", "01",
-         "Monitore os principais indicadores do fundo em tempo real — inadimplência, PL, cotas e classificação SCR.",
+        (ICON_DASH, "Dashboard",    "01", "pages/01_dashboard.py",
+         "Monitore indicadores, inadimplência, PL, cotas e SCR em tempo real.",
          ["Inadimplência", "Vencimentos", "SCR Bacen", "Cotas"]),
-        (ICON_DOC, "Documentos", "02",
-         "Acesse regulamentos, lâminas e relatórios com resumo gerado automaticamente por inteligência artificial.",
+        (ICON_DOC,  "Documentos",   "02", "pages/02_documentos.py",
+         "Acesse regulamentos e relatórios com resumo gerado por inteligência artificial.",
          ["Regulamento", "Lâmina", "Resumo IA", "Histórico"]),
-        (ICON_PREC, "Precificação", "03",
-         "Precifique pools de direitos creditórios utilizando modelos quantitativos com parâmetros configuráveis.",
+        (ICON_PREC, "Precificação", "03", "pages/03_precificacao.py",
+         "Precifique pools de direitos creditórios com modelos quantitativos.",
          ["Modelagem", "Cenários", "Exportação", "Histórico"]),
     ]
 
     c1, c2, c3 = st.columns(3)
-    for col, (icon, titulo, numero, desc, tags) in zip([c1, c2, c3], cards):
+    for col, (icon, titulo, numero, page, desc, tags) in zip([c1, c2, c3], cards):
         tags_html = "".join([
             f'<span style="font-size:10px;font-family:\'DM Mono\',monospace;padding:2px 8px;'
             f'border-radius:10px;border:1px solid rgba(64,123,110,0.25);'
@@ -343,7 +342,7 @@ def _tela_home(usuario: dict):
         with col:
             st.markdown(f"""
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(64,123,110,0.18);
-                        border-top:2px solid #407b6e;border-radius:12px;padding:24px;height:100%;">
+                        border-top:2px solid #407b6e;border-radius:12px;padding:24px 24px 12px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
                     <div style="width:40px;height:40px;border-radius:10px;
                                 background:rgba(64,123,110,0.1);border:1px solid rgba(64,123,110,0.2);
@@ -356,10 +355,13 @@ def _tela_home(usuario: dict):
                     </div>
                 </div>
                 <div style="font-size:16px;font-weight:500;color:#fff;margin-bottom:8px;">{titulo}</div>
-                <div style="font-size:13px;color:rgba(255,255,255,0.4);line-height:1.7;margin-bottom:18px;">{desc}</div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;">{tags_html}</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.4);line-height:1.7;margin-bottom:16px;">{desc}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px;">{tags_html}</div>
             </div>
             """, unsafe_allow_html=True)
+
+            # Botão de navegação nativo do Streamlit
+            st.page_link(page, label=f"Acessar {titulo} →", use_container_width=True)
 
     from datetime import datetime
     agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
