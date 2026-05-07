@@ -330,3 +330,43 @@ def carregar_pdf_bytes(pdf_path: Path) -> bytes | None:
     except Exception as e:
         log.error(f"Erro ao ler PDF {pdf_path}: {e}")
         return None
+
+
+def carregar_notas(base_dir: str | Path, fundo_id: str, tipo: str, stem: str) -> str:
+    """
+    Carrega as notas de um documento (.notes.md).
+    Retorna string vazia se não existir.
+    """
+    base_dir  = Path(base_dir)
+    path      = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.md"
+    if not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception as e:
+        log.error(f"Erro ao ler notas {path}: {e}")
+        return ""
+
+
+def salvar_notas(base_dir: str | Path, fundo_id: str, tipo: str, stem: str, conteudo: str) -> bool:
+    """
+    Salva as notas de um documento (.notes.md).
+
+    Returns:
+        True se salvo com sucesso, False em caso de erro.
+    """
+    base_dir  = Path(base_dir)
+    path      = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.md"
+    try:
+        path.write_text(conteudo, encoding="utf-8")
+        return True
+    except Exception as e:
+        log.error(f"Erro ao salvar notas {path}: {e}")
+        return False
+
+
+def notas_existem(base_dir: str | Path, fundo_id: str, tipo: str, stem: str) -> bool:
+    """Verifica se existem notas para um documento."""
+    base_dir = Path(base_dir)
+    path     = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.md"
+    return path.exists() and path.stat().st_size > 0

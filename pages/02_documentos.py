@@ -16,6 +16,9 @@ from core.loader import (
     listar_documentos,
     carregar_documento_insight,
     carregar_pdf_bytes,
+    carregar_notas,
+    salvar_notas,
+    notas_existem,
     TIPOS_DOCUMENTO,
 )
 from core.auth import fundos_permitidos
@@ -212,6 +215,16 @@ def _md_to_html(md: str) -> str:
 
 
 
+def _badge_notas(tem: bool) -> str:
+    if tem:
+        return (
+            '<span style="font-size:10px;font-family:DM Mono,monospace;padding:2px 8px;'
+            'border-radius:10px;background:rgba(74,158,255,0.1);color:#4a9eff;'
+            'border:1px solid rgba(74,158,255,0.3);margin-left:4px;">com notas</span>'
+        )
+    return ""
+
+
 def _badge_insight(tem: bool) -> str:
     if tem:
         return (
@@ -235,6 +248,127 @@ def _sem_documentos():
 # ---------------------------------------------------------------------------
 # MAIN
 # ---------------------------------------------------------------------------
+
+def _renderizar_notas(base_dir: Path, fundo_id: str, tipo: str, doc: dict):
+    """Renderiza a aba de notas com editor e visualizador."""
+    from datetime import datetime
+
+    stem = doc["stem"]
+
+    # Chave de sessão única por documento
+    key_modo  = f"notas_modo_{fundo_id}_{tipo}_{stem}"
+    key_texto = f"notas_texto_{fundo_id}_{tipo}_{stem}"
+
+    # Inicializa estado
+    if key_modo not in st.session_state:
+        st.session_state[key_modo] = "visualizar"
+    if key_texto not in st.session_state:
+        st.session_state[key_texto] = carregar_notas(base_dir, fundo_id, tipo, stem)
+
+    notas_atuais = st.session_state[key_texto]
+    modo         = st.session_state[key_modo]
+
+    # ── Header ──
+    col_title, col_actions = st.columns([3, 2])
+    with col_title:
+        st.markdown(f"""
+        <div style="padding:8px 0 16px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                        text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:4px;">
+                Notas · {doc["nome"]}
+            </div>
+            <div style="font-size:16px;font-weight:500;color:#fff;">
+                Anotações sobre este documento
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_actions:
+        st.markdown("<div style='padding-top:16px;'>", unsafe_allow_html=True)
+        if modo == "visualizar":
+            if st.button("✏️ Editar notas", use_container_width=True, type="primary"):
+                st.session_state[key_modo] = "editar"
+                st.rerun()
+        else:
+            col_s, col_c = st.columns(2)
+            with col_s:
+                if st.button("💾 Salvar", use_container_width=True, type="primary"):
+                    ok = salvar_notas(base_dir, fundo_id, tipo, stem,
+                                      st.session_state[key_texto])
+                    if ok:
+                        st.session_state[key_modo] = "visualizar"
+                        st.success("Notas salvas!")
+                        st.rerun()
+                    else:
+                        st.error("Erro ao salvar.")
+            with col_c:
+                if st.button("✕ Cancelar", use_container_width=True):
+                    # Descarta alterações — recarrega do disco
+                    st.session_state[key_texto] = carregar_notas(base_dir, fundo_id, tipo, stem)
+                    st.session_state[key_modo]  = "visualizar"
+                    st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:0 0 16px;'>",
+                unsafe_allow_html=True)
+
+    # ── Editor ou visualizador ──
+    if modo == "editar":
+        st.markdown("""
+        <div style="font-size:11px;font-family:'DM Mono',monospace;color:rgba(255,255,255,0.3);
+                    margin-bottom:8px;">
+            Suporte a Markdown — **negrito**, *itálico*, listas, títulos com ##
+        </div>
+        """, unsafe_allow_html=True)
+
+        novo_texto = st.text_area(
+            label="Notas",
+            value=st.session_state[key_texto],
+            height=500,
+            placeholder="Escreva suas anotações aqui... Suporte a Markdown: ## Título, - Lista, **negrito**, *itálico*",
+            label_visibility="collapsed",
+            key=f"textarea_{fundo_id}_{tipo}_{stem}",
+        )
+        st.session_state[key_texto] = novo_texto
+
+    else:
+        # Modo visualização
+        if not notas_atuais.strip():
+            st.markdown("""
+            <div style="text-align:center;padding:60px 0;">
+                <div style="font-size:28px;margin-bottom:12px;">📝</div>
+                <div style="font-size:13px;font-family:'DM Mono',monospace;
+                            color:rgba(255,255,255,0.2);margin-bottom:6px;">
+                    Nenhuma anotação ainda
+                </div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.15);">
+                    Clique em "Editar notas" para começar
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Renderiza markdown das notas
+            html_notas = _md_to_html(notas_atuais)
+            st.markdown(
+                f'<div style="background:rgba(255,255,255,0.02);'
+                f'border:1px solid rgba(64,123,110,0.15);border-radius:12px;'
+                f'padding:24px 28px;">{html_notas}</div>',
+                unsafe_allow_html=True
+            )
+
+            # Metadata
+            notes_path = base_dir / "data" / "funds" / fundo_id / "documentos" / tipo / f"{stem}.notes.md"
+            if notes_path.exists():
+                import os
+                mtime = datetime.fromtimestamp(os.path.getmtime(notes_path))
+                st.markdown(f"""
+                <div style="font-size:10px;font-family:'DM Mono',monospace;
+                            color:rgba(255,255,255,0.2);margin-top:12px;text-align:right;">
+                    Última edição: {mtime.strftime("%d/%m/%Y às %H:%M")}
+                </div>
+                """, unsafe_allow_html=True)
+
+
 
 def main():
     _estilo()
@@ -330,6 +464,7 @@ def main():
                         PDF
                     </span>
                     {_badge_insight(doc["tem_insight"])}
+                    {_badge_notas(notas_existem(BASE_DIR, fundo_id, doc["tipo"], doc["stem"]))}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -343,7 +478,7 @@ def main():
         doc_atual = next((d for d in docs if d["stem"] == st.session_state.doc_selecionado), docs[0])
 
         # ── Tabs: PDF | Resumo ──
-        tab_pdf, tab_resumo = st.tabs(["📄 Visualizar documento", "✨ Resumo com IA"])
+        tab_pdf, tab_resumo, tab_notas = st.tabs(["📄 Visualizar documento", "✨ Resumo com IA", "📝 Notas"])
 
         with tab_pdf:
             st.markdown(f"""
@@ -435,6 +570,9 @@ def main():
                     if st.button("✕ Fechar resumo", use_container_width=False):
                         st.session_state.mostrar_insight = False
                         st.rerun()
+
+        with tab_notas:
+            _renderizar_notas(BASE_DIR, fundo_id, tipo_selecionado, doc_atual)
 
 
 if __name__ == "__main__":
