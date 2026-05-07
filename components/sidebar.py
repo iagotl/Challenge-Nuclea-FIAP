@@ -27,7 +27,40 @@ def render(base_dir) -> tuple[str | None, str | None]:
     """
     usuario = usuario_logado(st)
 
+    # CSS da sidebar — aplicado uma vez
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {
+        background: #0a1012 !important;
+        border-right: 1px solid rgba(64,123,110,0.2) !important;
+    }
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] div { color: #fff !important; }
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        background: rgba(255,255,255,0.04) !important;
+        border: 1px solid rgba(64,123,110,0.25) !important;
+        border-radius: 8px !important;
+        color: #fff !important;
+    }
+    [data-testid="stSidebar"] .stSelectbox svg { fill: rgba(255,255,255,0.4) !important; }
+    [data-testid="stSidebar"] .stButton > button {
+        border: 1px solid rgba(64,123,110,0.4) !important;
+        background: transparent !important;
+        color: rgba(255,255,255,0.6) !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(64,123,110,0.1) !important;
+        color: #fff !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     with st.sidebar:
+        # Widget nativo necessário para o Streamlit ativar a sidebar
+        st.markdown("&nbsp;", unsafe_allow_html=True)
 
         # ── Logo e marca ──
         st.markdown(f"""

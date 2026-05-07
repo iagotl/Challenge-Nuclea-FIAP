@@ -249,6 +249,8 @@ def _tela_login():
 
 def _renderizar_sidebar(usuario: dict):
     with st.sidebar:
+        # Widget nativo garante que a sidebar é ativada pelo Streamlit
+        st.markdown("&nbsp;", unsafe_allow_html=True)
         st.markdown(f"""
         <div style="padding:16px 0 20px;border-bottom:1px solid rgba(64,123,110,0.2);margin-bottom:16px;">
             <div style="display:flex;align-items:center;gap:10px;">

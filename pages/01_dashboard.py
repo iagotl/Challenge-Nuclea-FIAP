@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 BASE_DIR = Path(__file__).parent.parent
 
 from core.auth import sessao_ativa, usuario_logado
-from core.loader import carregar_ultima_competencia, carregar_competencia, carregar_historico
+from core.loader import carregar_competencia, carregar_historico, listar_fundos
 from core.metrics import calcular_todas
 from components.sidebar import render as render_sidebar
 
@@ -1528,20 +1528,25 @@ def _aba_carteira(dados: dict, metricas: dict):
 # ABA: PAINEL GERAL
 # ---------------------------------------------------------------------------
 
-def _aba_painel_geral(dados: dict, metricas: dict):
+def _aba_painel_geral(dados: dict, metricas: dict, _fundo_id: str = ""):
 
     cab = dados["cabecalho"]
     at  = dados["ativo"]
     pl  = dados["patrimonio_liquido"]
 
     # ── Header ──
+    # Busca nome do fundo no funds.yaml
+    from core.loader import listar_fundos as _lf
+    _fundos = _lf(BASE_DIR)
+    _nome_fundo = next((f["nome"] for f in _fundos if f["id"] == _fundo_id), cab.get("cnpj_fundo", "FIDC"))
+
     col_header, col_home = st.columns([5, 1])
     with col_header:
         st.markdown(f"""
         <div style="padding:20px 0 24px;">
             <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.12em;
                         text-transform:uppercase;color:#407b6e;margin-bottom:6px;">
-                {cab.get('nome_classe') or 'FIDC'} · Informe Mensal
+                {_nome_fundo} · Informe Mensal
             </div>
             <div style="font-size:22px;font-weight:500;color:#fff;margin-bottom:4px;">
                 Posição consolidada — {cab['competencia']}
@@ -1761,8 +1766,63 @@ def main():
         st.warning("Sessão expirada. Faça login novamente.")
         st.stop()
 
-    # Sidebar — retorna fundo e competência selecionados
-    fundo_id, competencia = render_sidebar(BASE_DIR)
+    usuario = usuario_logado(st)
+
+    # ── Barra de controles no topo ──
+    from core.loader import listar_fundos, listar_competencias
+    from core.auth import fundos_permitidos as _fp
+
+    todos_fundos    = listar_fundos(BASE_DIR)
+    fundos_visiveis = _fp(usuario, todos_fundos) if usuario else todos_fundos
+    fundos_ativos   = [f for f in fundos_visiveis
+                       if f.get("ativo", True) and f.get("competencias_disponiveis", 0) > 0]
+
+    if not fundos_ativos:
+        _sem_dados()
+        return
+
+    col_logo, col_fundo, col_comp, col_home = st.columns([2, 2, 2, 1])
+
+    with col_logo:
+        st.markdown("""
+        <div style="padding:8px 0 4px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.12em;
+                        text-transform:uppercase;color:#407b6e;">
+                RAIZ · Dashboard
+            </div>
+            <div style="font-size:14px;font-weight:500;color:#fff;">
+                Painel de Gestão FIDC
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_fundo:
+        opcoes_fundo = {f["nome"]: f["id"] for f in fundos_ativos}
+        fundo_nome   = st.selectbox(
+            "Fundo",
+            options=list(opcoes_fundo.keys()),
+            label_visibility="visible",
+        )
+        fundo_id = opcoes_fundo[fundo_nome]
+
+    with col_comp:
+        competencias = listar_competencias(BASE_DIR, fundo_id)
+        if not competencias:
+            _sem_dados()
+            return
+        competencia = st.selectbox(
+            "Competência",
+            options=competencias,
+            label_visibility="visible",
+        )
+
+    with col_home:
+        st.markdown("<div style='padding-top:24px;'>", unsafe_allow_html=True)
+        st.page_link("app.py", label="← Home", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.2);margin:8px 0 0;'>",
+                unsafe_allow_html=True)
 
     if not fundo_id or not competencia:
         _sem_dados()
@@ -1778,14 +1838,15 @@ def main():
 
     metricas = calcular_todas(dados, historico)
 
-    # Adiciona negócios ao dict de métricas para os alertas
+    # Adiciona negócios e contexto ao dict de métricas
     neg = dados["negocios_mes"]
     metricas["negocios"] = {
         "aquisicoes_total": neg["aquisicoes"]["total"]["valor"],
     }
 
-    fundo_id    = fundo_id
-    competencia = competencia
+    # Guarda fundo_id e competencia para uso nas abas
+    _fundo_id    = fundo_id
+    _competencia = competencia
 
     # ── Abas ──
     abas = st.tabs([
@@ -1799,7 +1860,7 @@ def main():
     ])
 
     with abas[0]:
-        _aba_painel_geral(dados, metricas)
+        _aba_painel_geral(dados, metricas, _fundo_id)
 
     with abas[1]:
         _aba_carteira(dados, metricas)
@@ -1813,7 +1874,7 @@ def main():
     with abas[5]:
         _aba_cedentes(dados, metricas)
     with abas[6]:
-        _aba_relatorios(dados, metricas, fundo_id, competencia)
+        _aba_relatorios(dados, metricas, _fundo_id, _competencia)
 
 
 if __name__ == "__main__":
