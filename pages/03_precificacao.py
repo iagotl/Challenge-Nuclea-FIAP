@@ -51,6 +51,22 @@ def _estilo():
         background:rgba(64,123,110,0.1) !important; color:#fff !important;
     }
     .stDataFrame{ border-radius:8px !important; }
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        background: rgba(64,123,110,0.06) !important;
+        border: 1px dashed rgba(64,123,110,0.4) !important;
+        border-radius: 10px !important;
+        padding: 8px !important;
+    }
+    [data-testid="stFileUploader"] label {
+        color: rgba(255,255,255,0.6) !important;
+    }
+    [data-testid="stFileUploaderDropzone"] {
+        background: transparent !important;
+    }
+    [data-testid="stFileUploaderDropzoneInstructions"] p {
+        color: rgba(255,255,255,0.5) !important;
+    }
     .stTabs [data-baseweb="tab-list"]{
         gap:4px; background:rgba(255,255,255,0.02); border-radius:10px;
         padding:4px; border:1px solid rgba(64,123,110,0.15);
@@ -228,11 +244,32 @@ def _calcular_precificacao(df: pd.DataFrame, modelo, metadata: dict) -> pd.DataF
 # SEÇÕES DA PÁGINA
 # ---------------------------------------------------------------------------
 
+def _faixa_valor(v):
+    if v <= 1_000:    return "até R$ 1K"
+    if v <= 5_000:    return "R$ 1K – 5K"
+    if v <= 50_000:   return "R$ 5K – 50K"
+    if v <= 500_000:  return "R$ 50K – 500K"
+    return "acima R$ 500K"
+
+ORDEM_VALOR = ["até R$ 1K","R$ 1K – 5K","R$ 5K – 50K","R$ 50K – 500K","acima R$ 500K"]
+CORES_VALOR = ["#4adb8a","#c8f55a","#407b6e","#f5a623","#ff5a4a"]
+
+def _faixa_prazo(d):
+    if pd.isna(d) or d < 0: return "Sem info"
+    if d <= 30:   return "até 30d"
+    if d <= 60:   return "31–60d"
+    if d <= 90:   return "61–90d"
+    if d <= 180:  return "91–180d"
+    return "acima 180d"
+
+ORDEM_PRAZO  = ["até 30d","31–60d","61–90d","91–180d","acima 180d","Sem info"]
+CORES_PRAZO  = ["#ff5a4a","#f5a623","#c8f55a","#407b6e","#4a9eff","#555550"]
+
+
 def _secao_visao_pool(df_raw: pd.DataFrame):
     """Visão exploratória do pool recebido."""
     _secao("01 · visão do pool", "Composição e características dos boletos")
 
-    # KPIs
     total   = len(df_raw)
     vl_tot  = df_raw["vlr_nominal"].sum()
     vl_med  = df_raw["vlr_nominal"].median()
@@ -240,73 +277,163 @@ def _secao_visao_pool(df_raw: pd.DataFrame):
     pags_u  = df_raw["id_pagador"].nunique() if "id_pagador" in df_raw.columns else 0
     ced_u   = df_raw["id_beneficiario"].nunique() if "id_beneficiario" in df_raw.columns else 0
 
+    # Validação de duplicatas
+    col_dup = "id_boleto" if "id_boleto" in df_raw.columns else None
+    n_dup   = df_raw[col_dup].duplicated().sum() if col_dup else 0
+
     cols = st.columns(5)
     for col, (label, val, sub, cor) in zip(cols, [
-        ("Total de boletos",     f"{total:,}",        "no pool",                   "#fff"),
-        ("Valor nominal total",  _fmt_brl(vl_tot),    "soma face value",           "#c8f55a"),
-        ("Valor mediano",        _fmt_brl(vl_med),    "mediana por boleto",        "#fff"),
-        ("Prazo mediano",        f"{prazo_m:.0f} dias","emissão → vencimento",     "#fff"),
-        ("Pagadores únicos",     f"{pags_u:,}",       f"{ced_u} cedentes únicos",  "#4a9eff"),
+        ("Total de boletos",    f"{total:,}",         "no pool",                  "#fff"),
+        ("Valor nominal total", _fmt_brl(vl_tot),     "soma face value",          "#c8f55a"),
+        ("Valor mediano",       _fmt_brl(vl_med),     "mediana por boleto",       "#fff"),
+        ("Prazo mediano",       f"{prazo_m:.0f} dias","emissão → vencimento",     "#fff"),
+        ("Pagadores únicos",    f"{pags_u:,}",        f"{ced_u} cedentes únicos", "#4a9eff"),
     ]):
         with col:
             st.markdown(_kpi(label, val, sub, cor), unsafe_allow_html=True)
 
+    # Alerta de duplicatas
+    if n_dup > 0:
+        _alerta("red", f"⚠️ {n_dup} boleto(s) duplicado(s) detectado(s)",
+                f"Encontrados {n_dup} id_boleto repetidos no pool — possível indício de fraude ou erro operacional. "
+                f"Verifique antes de prosseguir com a precificação.")
+    else:
+        _alerta("green", "Nenhum boleto duplicado encontrado",
+                "Todos os id_boleto são únicos no pool.")
+
     st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:20px 0;'>",
                 unsafe_allow_html=True)
 
-    # Gráficos
-    col1, col2, col3 = st.columns(3)
+    # ── Linha 1: Valor + Espécie ──
+    col1, col_sep1, col2 = st.columns([5, 0.2, 4])
 
     with col1:
-        fig = go.Figure(go.Histogram(
-            x=df_raw["vlr_nominal"],
-            nbinsx=40,
-            marker_color="#407b6e",
-            hovertemplate="R$ %{x:,.0f}<br>%{y} boletos<extra></extra>",
+        df_raw["_faixa_valor"] = df_raw["vlr_nominal"].apply(_faixa_valor)
+        vc_val = (
+            df_raw.groupby("_faixa_valor")["vlr_nominal"]
+            .agg(qtd="count", total="sum")
+            .reindex(ORDEM_VALOR)
+            .dropna()
+            .reset_index()
+        )
+        fig = go.Figure(go.Bar(
+            x=vc_val["_faixa_valor"],
+            y=vc_val["qtd"],
+            marker=dict(color=CORES_VALOR[:len(vc_val)], line=dict(color="#0d1415", width=1)),
+            text=vc_val["qtd"],
+            textposition="outside",
+            textfont=dict(color="rgba(255,255,255,0.6)", size=11),
+            hovertemplate="<b>%{x}</b><br>%{y} boletos<extra></extra>",
         ))
-        fig.update_layout(title=dict(text="Distribuição de valores", font=dict(size=12, color="rgba(255,255,255,0.5)")))
-        st.plotly_chart(_plotly_dark(fig), use_container_width=True, config={"displayModeBar": False})
+        fig.update_layout(
+            title=dict(text="Distribuição por faixa de valor", font=dict(size=12, color="rgba(255,255,255,0.5)")),
+            xaxis=dict(categoryorder="array", categoryarray=ORDEM_VALOR),
+            bargap=0.25,
+        )
+        st.plotly_chart(_plotly_dark(fig, height=300), use_container_width=True, config={"displayModeBar": False})
+
+    with col_sep1:
+        st.markdown("<div style='border-left:1px solid rgba(64,123,110,0.2);height:300px;margin-top:40px;'></div>",
+                    unsafe_allow_html=True)
 
     with col2:
         if "tipo_especie" in df_raw.columns:
-            vc = df_raw["tipo_especie"].value_counts().head(6)
+            vc = df_raw["tipo_especie"].value_counts().head(6).reset_index()
+            vc.columns = ["especie", "qtd"]
+            # Abrevia nomes longos
+            vc["especie_curta"] = vc["especie"].str.split(" ").str[:3].str.join(" ")
             fig = go.Figure(go.Bar(
-                x=vc.values, y=vc.index,
+                x=vc["qtd"], y=vc["especie_curta"],
                 orientation="h",
-                marker_color="#4a9eff",
-                hovertemplate="%{y}<br>%{x} boletos<extra></extra>",
+                marker=dict(color="#4a9eff", line=dict(color="#0d1415", width=1)),
+                text=vc["qtd"],
+                textposition="outside",
+                textfont=dict(color="rgba(255,255,255,0.6)", size=11),
+                hovertemplate="<b>%{y}</b><br>%{x} boletos<extra></extra>",
             ))
-            fig.update_layout(title=dict(text="Tipo de espécie", font=dict(size=12, color="rgba(255,255,255,0.5)")))
-            st.plotly_chart(_plotly_dark(fig), use_container_width=True, config={"displayModeBar": False})
+            fig.update_layout(
+                title=dict(text="Tipo de espécie", font=dict(size=12, color="rgba(255,255,255,0.5)")),
+                bargap=0.3,
+            )
+            st.plotly_chart(_plotly_dark(fig, height=300), use_container_width=True, config={"displayModeBar": False})
 
-    with col3:
-        if "dias_entre_emissao_vencimento" in df_raw.columns:
-            fig = go.Figure(go.Histogram(
-                x=df_raw["dias_entre_emissao_vencimento"].clip(0, 365),
-                nbinsx=30,
-                marker_color="#c8f55a",
-                hovertemplate="%{x} dias<br>%{y} boletos<extra></extra>",
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:8px 0 16px;'>",
+                unsafe_allow_html=True)
+
+    # ── Linha 2: Prazo ──
+    if "dias_entre_emissao_vencimento" in df_raw.columns:
+        col3, col_sep2, col4 = st.columns([4, 0.2, 5])
+
+        with col3:
+            df_raw["_faixa_prazo"] = df_raw["dias_entre_emissao_vencimento"].apply(_faixa_prazo)
+            vc_prazo = (
+                df_raw["_faixa_prazo"].value_counts()
+                .reindex(ORDEM_PRAZO)
+                .dropna()
+                .reset_index()
+            )
+            vc_prazo.columns = ["faixa", "qtd"]
+            cores_prazo_filtradas = [CORES_PRAZO[ORDEM_PRAZO.index(f)] for f in vc_prazo["faixa"]]
+
+            fig = go.Figure(go.Bar(
+                x=vc_prazo["faixa"],
+                y=vc_prazo["qtd"],
+                marker=dict(color=cores_prazo_filtradas, line=dict(color="#0d1415", width=1)),
+                text=vc_prazo["qtd"],
+                textposition="outside",
+                textfont=dict(color="rgba(255,255,255,0.6)", size=11),
+                hovertemplate="<b>%{x}</b><br>%{y} boletos<extra></extra>",
             ))
-            fig.update_layout(title=dict(text="Prazo de vencimento (dias)", font=dict(size=12, color="rgba(255,255,255,0.5)")))
-            st.plotly_chart(_plotly_dark(fig), use_container_width=True, config={"displayModeBar": False})
+            fig.update_layout(
+                title=dict(text="Prazo até vencimento", font=dict(size=12, color="rgba(255,255,255,0.5)")),
+                xaxis=dict(categoryorder="array", categoryarray=ORDEM_PRAZO),
+                bargap=0.3,
+            )
+            st.plotly_chart(_plotly_dark(fig, height=280), use_container_width=True, config={"displayModeBar": False})
 
-    # Concentração por pagador
+        with col_sep2:
+            st.markdown("<div style='border-left:1px solid rgba(64,123,110,0.2);height:280px;margin-top:40px;'></div>",
+                        unsafe_allow_html=True)
+
+        with col4:
+            # Top 8 pagadores por valor
+            if "id_pagador" in df_raw.columns:
+                top_pag = (
+                    df_raw.groupby("id_pagador")["vlr_nominal"].sum()
+                    .sort_values(ascending=True)
+                    .tail(8)
+                    .reset_index()
+                )
+                top_pag["id_curto"] = top_pag["id_pagador"].str[:12] + "..."
+                top_pag["pct"]      = top_pag["vlr_nominal"] / vl_tot * 100
+
+                fig = go.Figure(go.Bar(
+                    x=top_pag["vlr_nominal"], y=top_pag["id_curto"],
+                    orientation="h",
+                    marker=dict(color="#407b6e", line=dict(color="#0d1415", width=1)),
+                    text=top_pag["pct"].apply(lambda x: f"{x:.1f}%"),
+                    textposition="outside",
+                    textfont=dict(color="rgba(255,255,255,0.6)", size=11),
+                    hovertemplate="<b>%{y}</b><br>R$ %{x:,.0f}<extra></extra>",
+                ))
+                fig.update_layout(
+                    title=dict(text="Top 8 pagadores por valor", font=dict(size=12, color="rgba(255,255,255,0.5)")),
+                    xaxis=dict(tickformat=",.0f"),
+                    bargap=0.3,
+                )
+                st.plotly_chart(_plotly_dark(fig, height=280), use_container_width=True, config={"displayModeBar": False})
+
+    # Alerta concentração
     if "id_pagador" in df_raw.columns:
-        conc = (
-            df_raw.groupby("id_pagador")["vlr_nominal"].sum()
-            .sort_values(ascending=False)
-            .head(10)
-        )
+        conc     = df_raw.groupby("id_pagador")["vlr_nominal"].sum().sort_values(ascending=False)
         conc_pct = conc / vl_tot * 100
-        maior_conc = conc_pct.iloc[0]
-
-        if maior_conc > 30:
-            _alerta("amber", f"Concentração de {maior_conc:.1f}% no maior pagador",
-                    "Pool com concentração elevada em um único pagador. Avaliar risco de contraparte.")
-        elif maior_conc > 15:
-            _alerta("blue", f"Concentração de {maior_conc:.1f}% no maior pagador",
-                    "Concentração moderada. Top 10 pagadores representam "
-                    f"{conc_pct.sum():.1f}% do valor total.")
+        maior    = conc_pct.iloc[0]
+        if maior > 30:
+            _alerta("amber", f"Concentração de {maior:.1f}% no maior pagador",
+                    "Pool com concentração elevada. Avaliar risco de contraparte.")
+        elif maior > 15:
+            _alerta("blue", f"Concentração de {maior:.1f}% no maior pagador",
+                    f"Concentração moderada. Top 10 representam {conc_pct.head(10).sum():.1f}% do valor total.")
 
 
 def _secao_precificacao(resultado: pd.DataFrame, metadata: dict):
@@ -396,43 +523,80 @@ def _secao_precificacao(resultado: pd.DataFrame, metadata: dict):
     # Tabela detalhada
     _secao("03 · detalhamento", "Boleto a boleto com explicabilidade")
 
-    # Formata para exibição
-    df_exib = resultado[[
-        "id_boleto", "vlr_nominal", "tipo_especie",
-        "dias_vencimento", "prob_pagamento",
-        "valor_esperado", "valor_em_risco",
-        "faixa_risco", "decisao"
-    ]].copy()
+    CORES_FAIXA = {"Baixo risco": "#4adb8a", "Atenção": "#f5a623", "Alto risco": "#ff5a4a"}
+    CORES_DEC   = {"✅ Comprar": "#4adb8a", "⚠️ Revisar": "#f5a623"}
 
-    df_exib["vlr_nominal"]    = df_exib["vlr_nominal"].apply(lambda x: f"R$ {x:,.2f}")
-    df_exib["valor_esperado"] = df_exib["valor_esperado"].apply(lambda x: f"R$ {x:,.2f}")
-    df_exib["valor_em_risco"] = df_exib["valor_em_risco"].apply(lambda x: f"R$ {x:,.2f}")
-    df_exib["prob_pagamento"] = df_exib["prob_pagamento"].apply(lambda x: f"{x:.1%}")
-    df_exib["dias_vencimento"]= df_exib["dias_vencimento"].apply(
-        lambda x: f"{x:.0f}d" if pd.notna(x) else "N/D")
+    linhas_html = ""
+    for _, row in resultado.iterrows():
+        cor_faixa = CORES_FAIXA.get(row["faixa_risco"], "#fff")
+        cor_dec   = CORES_DEC.get(row["decisao"], "#fff")
+        id_curto  = str(row["id_boleto"])[:20] + "..." if len(str(row["id_boleto"])) > 20 else str(row["id_boleto"])
+        prazo_str = f"{row['dias_vencimento']:.0f}d" if pd.notna(row["dias_vencimento"]) else "N/D"
+        especie   = str(row["tipo_especie"])[:25] + "..." if len(str(row["tipo_especie"])) > 25 else str(row["tipo_especie"])
 
-    df_exib.columns = [
-        "ID Boleto", "Vlr. Nominal", "Espécie",
-        "Prazo", "Prob. Pagamento",
-        "Valor Esperado", "Valor em Risco",
-        "Faixa de Risco", "Decisão"
-    ]
+        linhas_html += f"""
+        <tr>
+            <td style="font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,0.4);"
+                title="{row['id_boleto']}">{id_curto}</td>
+            <td style="font-family:'DM Mono',monospace;color:#fff;text-align:right;">
+                R$ {row['vlr_nominal']:,.2f}</td>
+            <td style="color:rgba(255,255,255,0.6);font-size:12px;">{especie}</td>
+            <td style="font-family:'DM Mono',monospace;color:rgba(255,255,255,0.5);text-align:center;">
+                {prazo_str}</td>
+            <td style="font-family:'DM Mono',monospace;color:{cor_faixa};font-weight:500;text-align:center;">
+                {row['prob_pagamento']:.1%}</td>
+            <td style="font-family:'DM Mono',monospace;color:#c8f55a;text-align:right;">
+                R$ {row['valor_esperado']:,.2f}</td>
+            <td style="font-family:'DM Mono',monospace;color:#ff5a4a;text-align:right;">
+                R$ {row['valor_em_risco']:,.2f}</td>
+            <td style="text-align:center;">
+                <span style="font-size:11px;font-family:'DM Mono',monospace;padding:2px 10px;
+                             border-radius:10px;background:{cor_faixa}22;color:{cor_faixa};
+                             border:1px solid {cor_faixa}44;">
+                    {row["faixa_risco"]}
+                </span>
+            </td>
+            <td style="text-align:center;color:{cor_dec};font-size:13px;">{row["decisao"]}</td>
+        </tr>"""
 
-    st.dataframe(
-        df_exib,
-        use_container_width=True,
-        hide_index=True,
-        height=400,
-    )
+    th = ("padding:8px 12px;font-size:10px;font-family:'DM Mono',monospace;"
+          "letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.3);"
+          "border-bottom:1px solid rgba(64,123,110,0.25);background:#0d1415;")
 
-    # Download
+    st.markdown(f"""
+    <div style="overflow-x:auto;overflow-y:auto;max-height:420px;
+                background:rgba(255,255,255,0.02);border:1px solid rgba(64,123,110,0.2);
+                border-radius:10px;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="{th}text-align:left;">ID Boleto</th>
+                    <th style="{th}text-align:right;">Vlr. Nominal</th>
+                    <th style="{th}text-align:left;">Espécie</th>
+                    <th style="{th}text-align:center;">Prazo</th>
+                    <th style="{th}text-align:center;">Prob. Pag.</th>
+                    <th style="{th}text-align:right;">Vlr. Esperado</th>
+                    <th style="{th}text-align:right;">Vlr. em Risco</th>
+                    <th style="{th}text-align:center;">Faixa de Risco</th>
+                    <th style="{th}text-align:center;">Decisão</th>
+                </tr>
+            </thead>
+            <tbody>{linhas_html}</tbody>
+        </table>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Botão de exportar
     csv = resultado.to_csv(index=False).encode("utf-8")
+    st.markdown("<div style='margin-top:16px;display:flex;justify-content:flex-end;'>",
+                unsafe_allow_html=True)
     st.download_button(
         label="⬇ Exportar resultados completos (.csv)",
         data=csv,
         file_name="precificacao_pool.csv",
         mime="text/csv",
     )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
