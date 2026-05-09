@@ -53,6 +53,13 @@ def _estilo():
     .stDataFrame{ border-radius:8px !important; }
 
 
+    /* Page link — Home */
+    [data-testid="stPageLink"] a,
+    [data-testid="stPageLink"] span,
+    [data-testid="stPageLink"] p {
+        color: #ffffff !important;
+    }
+
     /* File uploader */
     [data-testid="stFileUploader"] {
         background: rgba(64,123,110,0.06) !important;
