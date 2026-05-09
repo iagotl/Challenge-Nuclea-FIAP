@@ -51,6 +51,8 @@ def _estilo():
         background:rgba(64,123,110,0.1) !important; color:#fff !important;
     }
     .stDataFrame{ border-radius:8px !important; }
+
+
     /* File uploader */
     [data-testid="stFileUploader"] {
         background: rgba(64,123,110,0.06) !important;
@@ -614,32 +616,29 @@ def _secao_oferta(resultado: pd.DataFrame, metadata: dict):
     # ── Inputs ──
     col_i1, col_i2, col_i3, col_sep, col_res = st.columns([1, 1, 1, 0.1, 2])
 
+    LBL = ("font-size:11px;font-family:'DM Mono',monospace;letter-spacing:0.08em;"
+           "text-transform:uppercase;color:#ffffff;margin-bottom:4px;display:block;")
+
     with col_i1:
-        cdi = st.number_input(
-            "CDI atual (% a.a.)",
-            min_value=0.0, max_value=50.0,
-            value=10.5, step=0.25,
-            format="%.2f",
-            help="Taxa CDI anual vigente. Referência: Bacen."
-        )
+        st.markdown(f'<span style="{LBL}">CDI atual (% a.a.)</span>', unsafe_allow_html=True)
+        cdi_str = st.text_input("cdi", value="10.50", placeholder="ex: 10.50",
+                                label_visibility="collapsed")
+        try:    cdi = float(cdi_str.replace(",", "."))
+        except: cdi = 10.5
 
     with col_i2:
-        spread = st.number_input(
-            "Spread desejado (% a.a.)",
-            min_value=0.0, max_value=30.0,
-            value=4.0, step=0.5,
-            format="%.2f",
-            help="Prêmio de risco exigido acima do CDI."
-        )
+        st.markdown(f'<span style="{LBL}">Spread desejado (% a.a.)</span>', unsafe_allow_html=True)
+        spread_str = st.text_input("spread", value="4.00", placeholder="ex: 4.00",
+                                   label_visibility="collapsed")
+        try:    spread = float(spread_str.replace(",", "."))
+        except: spread = 4.0
 
     with col_i3:
-        margem = st.number_input(
-            "Margem de segurança (%)",
-            min_value=0.0, max_value=50.0,
-            value=10.0, step=1.0,
-            format="%.1f",
-            help="Deságio aplicado sobre o valor esperado para cobrir incerteza do modelo."
-        )
+        st.markdown(f'<span style="{LBL}">Margem de segurança (%)</span>', unsafe_allow_html=True)
+        margem_str = st.text_input("margem", value="10.0", placeholder="ex: 10.0",
+                                   label_visibility="collapsed")
+        try:    margem = float(margem_str.replace(",", "."))
+        except: margem = 10.0
 
     # ── Cálculos ──
     custo_capital   = (cdi + spread) / 100
