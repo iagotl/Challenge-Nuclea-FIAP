@@ -8,6 +8,10 @@ numpy>=1.26
 # Gráficos
 plotly>=5.22
 
+# Machine Learning
+scikit-learn>=1.4
+joblib>=1.3
+
 # Leitura de PDF (módulo de documentos)
 pdfplumber>=0.11
 
