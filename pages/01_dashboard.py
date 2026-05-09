@@ -78,7 +78,14 @@ def _estilo():
         color: #fff !important;
     }
 
-    /* Botão Sair */
+    /* Page link — Home */
+    [data-testid="stPageLink"] a,
+    [data-testid="stPageLink"] span,
+    [data-testid="stPageLink"] p {
+        color: #ffffff !important;
+    }
+
+        /* Botão Sair */
     .stButton > button {
         border: 1px solid rgba(64,123,110,0.4) !important;
         background: transparent !important;

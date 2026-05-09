@@ -100,7 +100,14 @@ def _estilo():
     [data-testid="column"] .stButton > button[title="Apagar nota"]:hover {
         background:rgba(255,90,74,0.08) !important; border-radius:6px !important;
     }
-    iframe{ border-radius:8px; border:1px solid rgba(64,123,110,0.2); }
+    /* Page link — Home */
+    [data-testid="stPageLink"] a,
+    [data-testid="stPageLink"] span,
+    [data-testid="stPageLink"] p {
+        color: #ffffff !important;
+    }
+
+        iframe{ border-radius:8px; border:1px solid rgba(64,123,110,0.2); }
     .stTabs [data-baseweb="tab-list"]{
         gap:4px; background:rgba(255,255,255,0.02); border-radius:10px;
         padding:4px; border:1px solid rgba(64,123,110,0.15);

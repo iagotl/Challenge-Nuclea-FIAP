@@ -282,7 +282,7 @@ def _renderizar_sidebar(usuario: dict):
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("Sair", use_container_width=True):
+        if st.button("→ Sair", use_container_width=True, type="primary"):
             fazer_logout(st)
             st.rerun()
 
@@ -367,6 +367,7 @@ def _tela_home(usuario: dict):
 
     from datetime import datetime
     agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
     st.markdown(f"""
     <div style="margin-top:32px;padding-top:20px;border-top:1px solid rgba(64,123,110,0.12);
                 display:flex;align-items:center;justify-content:space-between;
@@ -379,6 +380,16 @@ def _tela_home(usuario: dict):
         <div>RAIZ · Gestão de Ativos · v1.0</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # Botão de logout
+    st.markdown("<div style='margin-top:16px;display:flex;justify-content:flex-end;'>",
+                unsafe_allow_html=True)
+    _, col_logout = st.columns([4, 1])
+    with col_logout:
+        if st.button("→ Sair da conta", use_container_width=True):
+            fazer_logout(st)
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
