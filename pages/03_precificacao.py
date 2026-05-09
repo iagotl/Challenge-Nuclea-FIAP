@@ -521,7 +521,20 @@ def _secao_precificacao(resultado: pd.DataFrame, metadata: dict):
                 unsafe_allow_html=True)
 
     # Tabela detalhada
-    _secao("03 · detalhamento", "Boleto a boleto com explicabilidade")
+    col_sec, col_dl = st.columns([4, 1])
+    with col_sec:
+        _secao("03 · detalhamento", "Boleto a boleto com explicabilidade")
+    with col_dl:
+        csv = resultado.to_csv(index=False).encode("utf-8")
+        st.markdown("<div style='padding-top:24px;'>", unsafe_allow_html=True)
+        st.download_button(
+            label="⬇ Exportar CSV",
+            data=csv,
+            file_name="precificacao_pool.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
 
     CORES_FAIXA = {"Baixo risco": "#4adb8a", "Atenção": "#f5a623", "Alto risco": "#ff5a4a"}
     CORES_DEC   = {"✅ Comprar": "#4adb8a", "⚠️ Revisar": "#f5a623"}
@@ -586,17 +599,162 @@ def _secao_precificacao(resultado: pd.DataFrame, metadata: dict):
     </div>
     """, unsafe_allow_html=True)
 
-    # Botão de exportar
-    csv = resultado.to_csv(index=False).encode("utf-8")
-    st.markdown("<div style='margin-top:16px;display:flex;justify-content:flex-end;'>",
+
+
+
+# ---------------------------------------------------------------------------
+# SEÇÃO: INTERPRETABILIDADE
+# ---------------------------------------------------------------------------
+
+def _secao_interpretabilidade(modelo, metadata: dict):
+    """Exibe coeficientes do modelo e interpretação das features."""
+
+    _secao("modelo · interpretabilidade", "Critérios e pesos usados na precificação")
+
+    threshold = metadata.get("best_threshold", 0.76)
+
+    # Extrai coeficientes
+    try:
+        lr        = modelo.named_steps["model"]
+        pre       = modelo.named_steps["preprocessor"]
+        num_names = metadata.get("numeric_features", [])
+        cat_names = []
+        if "cat" in pre.named_transformers_:
+            cat_enc   = pre.named_transformers_["cat"].named_steps["onehot"]
+            cat_feats = metadata.get("categorical_features", [])
+            cat_names = cat_enc.get_feature_names_out(cat_feats).tolist()
+
+        all_names = num_names + cat_names
+        coefs     = lr.coef_[0]
+        coef_dict = dict(zip(all_names, coefs))
+    except Exception as e:
+        st.warning(f"Não foi possível extrair coeficientes: {e}")
+        return
+
+    # Descrições das features numéricas
+    DESCRICOES = {
+        "log_vlr_nominal":                       ("Valor do boleto (log)",          "Boletos de maior valor têm relação com perfil de pagamento"),
+        "dias_entre_emissao_vencimento":          ("Prazo de vencimento (dias)",     "Prazos maiores tendem a ter mais incerteza de pagamento"),
+        "pagador_score_materialidade_v2":         ("Score de materialidade — pagador","Score de relevância financeira do pagador"),
+        "pagador_sacado_indice_liquidez_1m":      ("Índice de liquidez — pagador",   "Capacidade de pagamento no curto prazo do pagador"),
+        "pagador_media_atraso_dias":              ("Média de atraso — pagador",      "Histórico de atrasos do pagador. Maior atraso = maior risco"),
+        "cedente_indicador_liquidez_quantitativo_3m": ("Liquidez quantitativa — cedente","Saúde financeira do cedente nos últimos 3 meses"),
+        "cedente_score_materialidade_v2":         ("Score de materialidade — cedente","Score de relevância financeira do cedente"),
+    }
+
+    # Filtra só as features numéricas principais
+    features_principais = [f for f in num_names if f in coef_dict]
+    dados_coef = []
+    for feat in features_principais:
+        coef  = coef_dict[feat]
+        desc  = DESCRICOES.get(feat, (feat, ""))
+        dados_coef.append({
+            "feature":     feat,
+            "label":       desc[0],
+            "descricao":   desc[1],
+            "coeficiente": coef,
+            "impacto":     "↑ Aumenta prob. pagamento" if coef > 0 else "↓ Reduz prob. pagamento",
+            "cor":         "#4adb8a" if coef > 0 else "#ff5a4a",
+        })
+
+    dados_coef.sort(key=lambda x: abs(x["coeficiente"]), reverse=True)
+
+    # KPIs do modelo
+    col1, col2, col3, col4 = st.columns(4)
+    for col, (label, val, sub, cor) in zip([col1,col2,col3,col4], [
+        ("Threshold de decisão",  f"{threshold:.0%}",             "prob. mínima para comprar",      "#c8f55a"),
+        ("Features no modelo",    str(len(features_principais)),  "variáveis numéricas",            "#fff"),
+        ("Tipo de modelo",        "Regressão Logística",          "interpretável por coeficientes", "#4a9eff"),
+        ("Calibração",            "Brier Score 0.072",            "erro quadrático médio",          "#4adb8a"),
+    ]):
+        with col:
+            st.markdown(_kpi(label, val, sub, cor), unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:20px 0;'>",
                 unsafe_allow_html=True)
-    st.download_button(
-        label="⬇ Exportar resultados completos (.csv)",
-        data=csv,
-        file_name="precificacao_pool.csv",
-        mime="text/csv",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Gráfico de coeficientes
+    col_chart, col_tab = st.columns([1, 1])
+
+    with col_chart:
+        labels = [d["label"] for d in dados_coef]
+        valores = [d["coeficiente"] for d in dados_coef]
+        cores   = [d["cor"] for d in dados_coef]
+
+        fig = go.Figure(go.Bar(
+            x=valores,
+            y=labels,
+            orientation="h",
+            marker=dict(color=cores, line=dict(color="#0d1415", width=1)),
+            text=[f"{v:+.3f}" for v in valores],
+            textposition="outside",
+            textfont=dict(color="rgba(255,255,255,0.6)", size=11),
+            hovertemplate="<b>%{y}</b><br>Coeficiente: %{x:+.4f}<extra></extra>",
+        ))
+        fig.add_vline(x=0, line_color="rgba(255,255,255,0.2)", line_width=1)
+        fig.update_layout(
+            title=dict(text="Peso de cada variável no modelo",
+                       font=dict(size=12, color="rgba(255,255,255,0.5)")),
+            bargap=0.3,
+            xaxis=dict(title=dict(text="Coeficiente (positivo = favorece pagamento)",
+                                  font=dict(size=10, color="rgba(255,255,255,0.3)"))),
+        )
+        st.plotly_chart(_plotly_dark(fig, height=340), use_container_width=True,
+                        config={"displayModeBar": False})
+
+    with col_tab:
+        st.markdown("""
+        <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                    text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:12px;">
+            Interpretação das variáveis
+        </div>
+        """, unsafe_allow_html=True)
+
+        for d in dados_coef:
+            barra_w = min(abs(d["coeficiente"]) / max(abs(v) for v in valores) * 100, 100)
+            st.markdown(f"""
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(64,123,110,0.12);
+                        border-left:3px solid {d['cor']};border-radius:0 8px 8px 0;
+                        padding:10px 14px;margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="font-size:12px;font-weight:500;color:#fff;">{d['label']}</span>
+                    <span style="font-size:11px;font-family:'DM Mono',monospace;
+                                 color:{d['cor']};font-weight:500;">{d['coeficiente']:+.3f}</span>
+                </div>
+                <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;
+                            overflow:hidden;margin-bottom:6px;">
+                    <div style="height:100%;width:{barra_w:.0f}%;background:{d['cor']};
+                                border-radius:2px;"></div>
+                </div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.4);">{d['descricao']}</div>
+                <div style="font-size:10px;font-family:'DM Mono',monospace;
+                            color:{d['cor']};margin-top:4px;">{d['impacto']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:20px 0;'>",
+                unsafe_allow_html=True)
+
+    # Como ler o resultado
+    _secao("como interpretar", "Guia de leitura da precificação")
+    col_a, col_b, col_c = st.columns(3)
+
+    for col, (cor, titulo, desc) in zip([col_a, col_b, col_c], [
+        ("#4adb8a", "Baixo risco — prob. ≥ 90%",
+         "Alta probabilidade de pagamento. O valor esperado é próximo do valor nominal. Recomendado para aquisição."),
+        ("#f5a623", f"Atenção — prob. entre {threshold:.0%} e 90%",
+         "Probabilidade razoável, mas com desconto relevante. Avaliar custo de aquisição vs valor esperado."),
+        ("#ff5a4a", f"Alto risco — prob. < {threshold:.0%}",
+         "Probabilidade baixa de pagamento. Valor em risco elevado. Recomenda-se revisão individual antes de adquirir."),
+    ]):
+        with col:
+            st.markdown(f"""
+            <div style="background:rgba(255,255,255,0.02);border:1px solid {cor}44;
+                        border-top:2px solid {cor};border-radius:10px;padding:16px;height:100%;">
+                <div style="font-size:12px;font-weight:500;color:{cor};margin-bottom:8px;">{titulo}</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.55);line-height:1.7;">{desc}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -647,14 +805,7 @@ def main():
     # ── Upload ──
     _secao("upload", "Envie a base de boletos do pool")
 
-    col_up, col_info = st.columns([2, 3])
-
-    with col_up:
-        arquivo = st.file_uploader(
-            "Arquivo CSV com os boletos",
-            type=["csv"],
-            help="Colunas mínimas: id_boleto, id_pagador, id_beneficiario, dt_emissao, dt_vencimento, vlr_nominal, tipo_especie",
-        )
+    col_info, col_up = st.columns([3, 2])
 
     with col_info:
         st.markdown("""
@@ -664,7 +815,7 @@ def main():
                         text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:10px;">
                 Colunas esperadas no CSV
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
         """ + "".join([
             f'<span style="font-size:11px;font-family:\'DM Mono\',monospace;padding:3px 10px;'
             f'border-radius:6px;background:rgba(64,123,110,0.1);color:#407b6e;'
@@ -673,8 +824,20 @@ def main():
                       "dt_emissao","dt_vencimento","vlr_nominal","tipo_especie"]
         ]) + """
             </div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.3);line-height:1.6;">
+                A base auxiliar com scores de pagador e cedente é gerenciada internamente.<br>
+                O modelo usa <strong style="color:rgba(255,255,255,0.6);">8 variáveis</strong>
+                para estimar a probabilidade de pagamento de cada boleto.
+            </div>
         </div>
         """, unsafe_allow_html=True)
+
+    with col_up:
+        arquivo = st.file_uploader(
+            "Arquivo CSV com os boletos",
+            type=["csv"],
+            help="Colunas mínimas: id_boleto, id_pagador, id_beneficiario, dt_emissao, dt_vencimento, vlr_nominal, tipo_especie",
+        )
 
     if arquivo is None:
         st.markdown("""
@@ -710,13 +873,18 @@ def main():
                 unsafe_allow_html=True)
 
     # ── Tabs ──
-    tab_pool, tab_prec = st.tabs(["📊 Visão do pool", "💹 Precificação"])
+    tab_pool, tab_prec, tab_interp = st.tabs([
+        "📊 Visão do pool", "💹 Precificação", "🧠 Como o modelo decide"
+    ])
 
     with tab_pool:
         _secao_visao_pool(df_proc)
 
     with tab_prec:
         _secao_precificacao(resultado, metadata)
+
+    with tab_interp:
+        _secao_interpretabilidade(modelo, metadata)
 
 
 if __name__ == "__main__":

@@ -29,9 +29,9 @@ from sklearn.metrics import (
 )
 
 
-# ============================================================
+
 # CONSTANTES
-# ============================================================
+
 
 # Baixas consideradas como pagamento efetivo
 PAGAMENTOS_VALIDOS = [
@@ -62,9 +62,9 @@ SELECTED_FEATURES = [
 CATEGORICAL_COLS = ["tipo_especie"]
 
 
-# ============================================================
+
 # CLASSE PRINCIPAL
-# ============================================================
+
 
 class FIDCModelV2:
     def __init__(
@@ -125,9 +125,9 @@ class FIDCModelV2:
     def _pause(self):
         time.sleep(self.sleep_time)
 
-    # --------------------------------------------------------
+
     # 1. CARREGAR E MERGEAR
-    # --------------------------------------------------------
+
 
     def load_and_merge(self):
         self.logger.info("📥 Carregando bases...")
@@ -163,9 +163,9 @@ class FIDCModelV2:
         self.df_base = df
         self._pause()
 
-    # --------------------------------------------------------
+
     # 2. FEATURE ENGINEERING
-    # --------------------------------------------------------
+
 
     def feature_engineering(self):
         self.logger.info("🔧 Aplicando feature engineering...")
@@ -213,9 +213,9 @@ class FIDCModelV2:
         self.df_base = df
         self._pause()
 
-    # --------------------------------------------------------
+
     # 3. SPLIT TREINO/TESTE
-    # --------------------------------------------------------
+
 
     def split_data(self):
         self.logger.info("✂️  Dividindo treino e teste...")
@@ -256,9 +256,9 @@ class FIDCModelV2:
         )
         self._pause()
 
-    # --------------------------------------------------------
+
     # 4. PIPELINE E TREINO
-    # --------------------------------------------------------
+
 
     def build_and_train(self):
         self.logger.info("🏗️  Criando pipeline e treinando...")
@@ -289,9 +289,9 @@ class FIDCModelV2:
         self.logger.info("✅ Pipeline treinado")
         self._pause()
 
-    # --------------------------------------------------------
+
     # 5. BUSCA DO THRESHOLD ÓTIMO
-    # --------------------------------------------------------
+
 
     def find_best_threshold(self):
         self.logger.info("🎯 Buscando threshold ótimo...")
@@ -325,9 +325,9 @@ class FIDCModelV2:
         self.logger.info("\n" + self.threshold_df.to_string(index=False))
         self._pause()
 
-    # --------------------------------------------------------
+
     # 6. AVALIAR MODELO
-    # --------------------------------------------------------
+
 
     def evaluate(self):
         self.logger.info("📈 Avaliando modelo com threshold ótimo...")
@@ -370,9 +370,9 @@ class FIDCModelV2:
         print(self.cm_df.to_string())
         self._pause()
 
-    # --------------------------------------------------------
+
     # 7. CALIBRAÇÃO
-    # --------------------------------------------------------
+
 
     def calibrate(self):
         self.logger.info("🎚️  Calculando calibração...")
@@ -401,9 +401,9 @@ class FIDCModelV2:
         print(self.calibracao_df.to_string(index=False))
         self._pause()
 
-    # --------------------------------------------------------
+
     # 8. RESULTADO FINANCEIRO
-    # --------------------------------------------------------
+
 
     def financial_result(self):
         self.logger.info("💰 Calculando resultado financeiro...")
@@ -430,9 +430,9 @@ class FIDCModelV2:
         self.resultado_teste = res
         self._pause()
 
-    # --------------------------------------------------------
+
     # 9. SALVAR
-    # --------------------------------------------------------
+
 
     def save(self):
         self.logger.info("💾 Salvando artefatos...")
@@ -463,9 +463,9 @@ class FIDCModelV2:
         self.logger.info(f"✅ Artefatos salvos em {self.out_dir}")
         self._pause()
 
-    # --------------------------------------------------------
+
     # EXECUÇÃO COMPLETA
-    # --------------------------------------------------------
+
 
     def run(self):
         self.logger.info("🚀 Iniciando treinamento FIDC v2")
@@ -482,9 +482,9 @@ class FIDCModelV2:
         return self
 
 
-# ============================================================
+
 # EXECUÇÃO
-# ============================================================
+
 
 if __name__ == "__main__":
     trainer = FIDCModelV2(
