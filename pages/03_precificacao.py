@@ -603,6 +603,256 @@ def _secao_precificacao(resultado: pd.DataFrame, metadata: dict):
 
 
 # ---------------------------------------------------------------------------
+# SEÇÃO: OFERTA
+# ---------------------------------------------------------------------------
+
+def _secao_oferta(resultado: pd.DataFrame, metadata: dict):
+    """Painel de oferta — preço sugerido, TIR e índice de cobertura."""
+
+    _secao("oferta · parâmetros", "Configure os parâmetros do fundo para calcular a oferta")
+
+    # ── Inputs ──
+    col_i1, col_i2, col_i3, col_sep, col_res = st.columns([1, 1, 1, 0.1, 2])
+
+    with col_i1:
+        cdi = st.number_input(
+            "CDI atual (% a.a.)",
+            min_value=0.0, max_value=50.0,
+            value=10.5, step=0.25,
+            format="%.2f",
+            help="Taxa CDI anual vigente. Referência: Bacen."
+        )
+
+    with col_i2:
+        spread = st.number_input(
+            "Spread desejado (% a.a.)",
+            min_value=0.0, max_value=30.0,
+            value=4.0, step=0.5,
+            format="%.2f",
+            help="Prêmio de risco exigido acima do CDI."
+        )
+
+    with col_i3:
+        margem = st.number_input(
+            "Margem de segurança (%)",
+            min_value=0.0, max_value=50.0,
+            value=10.0, step=1.0,
+            format="%.1f",
+            help="Deságio aplicado sobre o valor esperado para cobrir incerteza do modelo."
+        )
+
+    # ── Cálculos ──
+    custo_capital   = (cdi + spread) / 100
+    margem_dec      = margem / 100
+
+    vl_nominal      = resultado["vlr_nominal"].sum()
+    vl_esperado     = resultado["valor_esperado"].sum()
+    vl_risco        = resultado["valor_em_risco"].sum()
+    preco_sugerido  = vl_esperado * (1 - margem_dec)
+    indice_cob      = vl_esperado / preco_sugerido if preco_sugerido > 0 else 0
+
+    # TIR usando prazo médio ponderado pelo valor
+    prazo_medio = (
+        (resultado["dias_vencimento"] * resultado["vlr_nominal"]).sum()
+        / resultado["vlr_nominal"].sum()
+        if resultado["vlr_nominal"].sum() > 0 else 30
+    )
+    prazo_medio = max(prazo_medio, 1)
+
+    tir = (vl_esperado / preco_sugerido) ** (365 / prazo_medio) - 1 if preco_sugerido > 0 else 0
+    excesso = tir - custo_capital
+
+    cor_tir     = "#4adb8a" if tir > custo_capital else "#ff5a4a"
+    cor_exc     = "#4adb8a" if excesso > 0 else "#ff5a4a"
+    cor_cob     = "#4adb8a" if indice_cob >= 1.10 else "#f5a623" if indice_cob >= 1.0 else "#ff5a4a"
+    sinal_exc   = "+" if excesso > 0 else ""
+
+    with col_res:
+        st.markdown(f"""
+        <div style="background:rgba(64,123,110,0.08);border:1px solid rgba(64,123,110,0.3);
+                    border-radius:10px;padding:16px 20px;margin-top:4px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                        text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:8px;">
+                Custo de capital do fundo
+            </div>
+            <div style="font-size:28px;font-weight:500;font-family:'DM Mono',monospace;
+                        color:#c8f55a;line-height:1;">
+                {custo_capital*100:.2f}% a.a.
+            </div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:6px;">
+                CDI {cdi:.2f}% + Spread {spread:.2f}%
+            </div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.25);margin-top:4px;
+                        font-family:'DM Mono',monospace;">
+                Prazo médio ponderado: {prazo_medio:.0f} dias
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:20px 0;'>",
+                unsafe_allow_html=True)
+
+    # ── KPIs de oferta ──
+    _secao("oferta · resultado", "Resumo da oferta para o pool")
+
+    cols = st.columns(5)
+    for col, (label, val, sub, cor) in zip(cols, [
+        ("Valor Nominal Total",   _fmt_brl(vl_nominal),    "face value do pool",                     "#fff"),
+        ("Valor Esperado Bruto",  _fmt_brl(vl_esperado),   f"Σ nominal × prob · perda: {_fmt_brl(vl_risco)}", "#4a9eff"),
+        ("Preço Sugerido",        _fmt_brl(preco_sugerido),f"deságio de {margem:.1f}% sobre esperado","#c8f55a"),
+        ("TIR Implícita",         f"{tir*100:.1f}% a.a.",  f"custo capital: {custo_capital*100:.2f}% a.a.", cor_tir),
+        ("Índice de Cobertura",   f"{indice_cob:.2f}x",    "esperado / preço sugerido",               cor_cob),
+    ]):
+        with col:
+            st.markdown(_kpi(label, val, sub, cor), unsafe_allow_html=True)
+
+    # Alerta de excesso de retorno
+    if excesso > 0:
+        _alerta("green",
+                f"Excesso de retorno: {sinal_exc}{excesso*100:.1f}% a.a. acima do custo de capital",
+                f"TIR de {tir*100:.1f}% supera o custo de capital de {custo_capital*100:.2f}%. "
+                f"Operação atrativa nas condições definidas.")
+    else:
+        _alerta("red",
+                f"TIR abaixo do custo de capital em {abs(excesso)*100:.1f}% a.a.",
+                f"Com os parâmetros atuais, o retorno esperado ({tir*100:.1f}% a.a.) não cobre o "
+                f"custo de capital ({custo_capital*100:.2f}% a.a.). "
+                f"Aumente a margem de segurança ou renegocie o preço.")
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:20px 0;'>",
+                unsafe_allow_html=True)
+
+    # ── Análise de sensibilidade ──
+    _secao("sensibilidade", "Como a margem afeta o preço e a TIR")
+
+    margens   = [0, 2, 5, 8, 10, 12, 15, 20]
+    precos    = [vl_esperado * (1 - m/100) for m in margens]
+    tirs      = [(vl_esperado / p) ** (365 / prazo_medio) - 1 if p > 0 else 0 for p in precos]
+    indices   = [vl_esperado / p if p > 0 else 0 for p in precos]
+
+    col_g1, col_g2 = st.columns(2)
+
+    with col_g1:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=margens, y=[t * 100 for t in tirs],
+            mode="lines+markers",
+            name="TIR (%)",
+            line=dict(color="#c8f55a", width=2),
+            marker=dict(size=7, color="#c8f55a"),
+            hovertemplate="Margem %{x}%<br>TIR: %{y:.1f}% a.a.<extra></extra>",
+        ))
+        # Linha do custo de capital
+        fig.add_hline(
+            y=custo_capital * 100,
+            line_dash="dash", line_color="#ff5a4a",
+            annotation_text=f"Custo capital {custo_capital*100:.1f}%",
+            annotation_font_color="#ff5a4a",
+        )
+        # Linha da margem atual
+        fig.add_vline(
+            x=margem, line_dash="dot", line_color="rgba(255,255,255,0.3)",
+            annotation_text=f"Margem atual {margem:.0f}%",
+            annotation_font_color="rgba(255,255,255,0.4)",
+        )
+        fig.update_layout(
+            title=dict(text="TIR vs Margem de segurança",
+                       font=dict(size=12, color="rgba(255,255,255,0.5)")),
+            xaxis=dict(title=dict(text="Margem (%)",
+                       font=dict(size=10, color="rgba(255,255,255,0.3)")),
+                       ticksuffix="%"),
+            yaxis=dict(title=dict(text="TIR (% a.a.)",
+                       font=dict(size=10, color="rgba(255,255,255,0.3)")),
+                       ticksuffix="%"),
+        )
+        st.plotly_chart(_plotly_dark(fig, height=300), use_container_width=True,
+                        config={"displayModeBar": False})
+
+    with col_g2:
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(
+            x=margens, y=precos,
+            mode="lines+markers",
+            name="Preço sugerido",
+            line=dict(color="#4a9eff", width=2),
+            marker=dict(size=7, color="#4a9eff"),
+            hovertemplate="Margem %{x}%<br>Preço: R$ %{y:,.0f}<extra></extra>",
+        ))
+        fig2.add_hline(
+            y=vl_esperado,
+            line_dash="dash", line_color="#407b6e",
+            annotation_text="Valor esperado",
+            annotation_font_color="#407b6e",
+        )
+        fig2.add_vline(
+            x=margem, line_dash="dot", line_color="rgba(255,255,255,0.3)",
+        )
+        fig2.update_layout(
+            title=dict(text="Preço sugerido vs Margem de segurança",
+                       font=dict(size=12, color="rgba(255,255,255,0.5)")),
+            xaxis=dict(title=dict(text="Margem (%)",
+                       font=dict(size=10, color="rgba(255,255,255,0.3)")),
+                       ticksuffix="%"),
+            yaxis=dict(tickformat=",.0f",
+                       title=dict(text="Preço (R$)",
+                       font=dict(size=10, color="rgba(255,255,255,0.3)"))),
+        )
+        st.plotly_chart(_plotly_dark(fig2, height=300), use_container_width=True,
+                        config={"displayModeBar": False})
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:20px 0;'>",
+                unsafe_allow_html=True)
+
+    # ── Tabela de sensibilidade ──
+    _secao("tabela de sensibilidade", "Resumo por faixa de margem")
+
+    th = ("padding:8px 12px;font-size:10px;font-family:'DM Mono',monospace;"
+          "letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.3);"
+          "border-bottom:1px solid rgba(64,123,110,0.25);background:#0d1415;")
+
+    linhas = ""
+    for m, p, t, ic in zip(margens, precos, tirs, indices):
+        eh_atual  = abs(m - margem) < 0.01
+        bg        = "rgba(64,123,110,0.1)" if eh_atual else "transparent"
+        borda     = "border-left:3px solid #407b6e;" if eh_atual else "border-left:3px solid transparent;"
+        cor_t     = "#4adb8a" if t > custo_capital else "#ff5a4a"
+        cor_ic    = "#4adb8a" if ic >= 1.10 else "#f5a623" if ic >= 1.0 else "#ff5a4a"
+        exc_val   = t - custo_capital
+        cor_exc   = "#4adb8a" if exc_val > 0 else "#ff5a4a"
+        sinal     = "+" if exc_val > 0 else ""
+        atual_tag = ' <span style="font-size:9px;background:rgba(64,123,110,0.3);color:#407b6e;padding:1px 6px;border-radius:8px;">atual</span>' if eh_atual else ""
+
+        linhas += f"""<tr style="background:{bg};{borda}border-bottom:1px solid rgba(255,255,255,0.04);">
+            <td style="padding:8px 12px;font-family:'DM Mono',monospace;color:#fff;">{m:.0f}%{atual_tag}</td>
+            <td style="padding:8px 12px;font-family:'DM Mono',monospace;color:#4a9eff;text-align:right;">
+                {_fmt_brl(p)}</td>
+            <td style="padding:8px 12px;font-family:'DM Mono',monospace;color:{cor_t};text-align:center;">
+                {t*100:.1f}% a.a.</td>
+            <td style="padding:8px 12px;font-family:'DM Mono',monospace;color:{cor_ic};text-align:center;">
+                {ic:.2f}x</td>
+            <td style="padding:8px 12px;font-family:'DM Mono',monospace;color:{cor_exc};text-align:center;">
+                {sinal}{exc_val*100:.1f}%</td>
+        </tr>"""
+
+    st.markdown(f"""
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(64,123,110,0.2);border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="{th}text-align:left;">Margem</th>
+                    <th style="{th}text-align:right;">Preço Sugerido</th>
+                    <th style="{th}text-align:center;">TIR Implícita</th>
+                    <th style="{th}text-align:center;">Índice Cobertura</th>
+                    <th style="{th}text-align:center;">Excesso vs Capital</th>
+                </tr>
+            </thead>
+            <tbody>{linhas}</tbody>
+        </table>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
 # SEÇÃO: INTERPRETABILIDADE
 # ---------------------------------------------------------------------------
 
@@ -873,8 +1123,8 @@ def main():
                 unsafe_allow_html=True)
 
     # ── Tabs ──
-    tab_pool, tab_prec, tab_interp = st.tabs([
-        "📊 Visão do pool", "💹 Precificação", "🧠 Como o modelo decide"
+    tab_pool, tab_prec, tab_oferta, tab_interp = st.tabs([
+        "📊 Visão do pool", "📈 Análise de Risco", "💰 Oferta", "🧠 Como o modelo decide"
     ])
 
     with tab_pool:
@@ -882,6 +1132,9 @@ def main():
 
     with tab_prec:
         _secao_precificacao(resultado, metadata)
+
+    with tab_oferta:
+        _secao_oferta(resultado, metadata)
 
     with tab_interp:
         _secao_interpretabilidade(modelo, metadata)
