@@ -21,3 +21,6 @@ pdfplumber>=0.11
 # Utilitários
 pyyaml>=6.0        # leitura dos .yaml de config
 bcrypt>=4.1        # hash de senhas no users.yaml
+
+# Chat com documentos (IA)
+google-generativeai>=0.7
