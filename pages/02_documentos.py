@@ -6,6 +6,8 @@ Repositório de documentos — FIDC · RAIZ
 from pathlib import Path
 from datetime import datetime
 import streamlit as st
+import pdfplumber
+import io
 
 BASE_DIR = Path(__file__).parent.parent
 
@@ -108,6 +110,12 @@ def _estilo():
     }
 
         iframe{ border-radius:8px; border:1px solid rgba(64,123,110,0.2); }
+    /* Chat — força texto branco */
+    .stMarkdown p, .stMarkdown li, .stMarkdown h1,
+    .stMarkdown h2, .stMarkdown h3, .stMarkdown span,
+    .stMarkdown td, .stMarkdown th {
+        color: #ffffff !important;
+    }
     .stTabs [data-baseweb="tab-list"]{
         gap:4px; background:rgba(255,255,255,0.02); border-radius:10px;
         padding:4px; border:1px solid rgba(64,123,110,0.15);
@@ -462,6 +470,238 @@ def _aba_notas(base_dir: Path, fundo_id: str, tipo: str, doc: dict):
 # MAIN
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# CHAT COM DOCUMENTO
+# ---------------------------------------------------------------------------
+
+def _extrair_texto_pdf(pdf_path: Path) -> str:
+    """Extrai texto de um PDF usando pdfplumber."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            paginas = []
+            for i, page in enumerate(pdf.pages):
+                texto = page.extract_text()
+                if texto:
+                    paginas.append(f"[Página {i+1}]\n{texto}")
+            return "\n\n".join(paginas)
+    except Exception as e:
+        return ""
+
+
+def _inicializar_gemini():
+    """Carrega a API key e inicializa o cliente Gemini."""
+    try:
+        import google.generativeai as genai
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
+        if not api_key:
+            return None, "GEMINI_API_KEY não encontrada em .streamlit/secrets.toml"
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        return model, None
+    except ImportError:
+        return None, "Biblioteca google-generativeai não instalada. Execute: pip install google-generativeai"
+    except Exception as e:
+        return None, str(e)
+
+
+def _system_prompt(nome_doc: str, texto_doc: str) -> str:
+    return f"""Você é o Assistente RAIZ, um especialista em fundos de investimento em direitos creditórios (FIDCs) da RAIZ Gestão de Ativos.
+
+Você tem acesso ao conteúdo completo do documento: **{nome_doc}**
+
+Conteúdo do documento:
+---
+{texto_doc[:15000]}
+---
+
+Regras que você deve seguir:
+1. Responda SOMENTE com base no conteúdo do documento acima
+2. Se a pergunta não puder ser respondida com o documento, diga claramente que a informação não está no documento
+3. Você PODE responder perguntas gerais sobre mercado financeiro, FIDCs, regulamentação CVM e conceitos financeiros — mas sempre deixe claro quando estiver usando conhecimento geral e não o documento
+4. Seja objetivo e preciso. Cite a seção ou cláusula do documento quando relevante
+5. Responda sempre em português brasileiro
+6. Nunca invente informações que não estejam no documento"""
+
+
+def _aba_chat(base_dir: Path, fundo_id: str, tipo: str, doc: dict):
+    """Aba de chat com o documento usando Gemini."""
+
+    stem     = doc["stem"]
+    key_hist = f"chat_hist_{fundo_id}_{tipo}_{stem}"
+    key_ctx  = f"chat_ctx_{fundo_id}_{tipo}_{stem}"
+    key_ini  = f"chat_ini_{fundo_id}_{tipo}_{stem}"
+
+    # Inicializa histórico
+    if key_hist not in st.session_state:
+        st.session_state[key_hist] = []
+    if key_ini not in st.session_state:
+        st.session_state[key_ini] = False
+
+    # ── Header ──
+    st.markdown(f"""
+    <div style="padding:8px 0 16px;">
+        <div style="font-size:10px;font-family:'DM Mono',monospace;letter-spacing:0.1em;
+                    text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:4px;">
+            Assistente RAIZ · {doc["nome_base"]}
+        </div>
+        <div style="font-size:16px;font-weight:500;color:#fff;">
+            Converse com este documento
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(64,123,110,0.15);margin:0 0 16px;'>",
+                unsafe_allow_html=True)
+
+    # Inicializa modelo
+    model, erro = _inicializar_gemini()
+    if erro:
+        st.markdown(f"""
+        <div style="display:flex;gap:12px;padding:12px 14px;border-radius:8px;
+                    background:rgba(255,90,74,0.08);border-left:3px solid #ff5a4a;">
+            <span style="color:#ff5a4a;font-size:10px;margin-top:2px;">●</span>
+            <div>
+                <div style="font-size:13px;font-weight:500;color:#fff;margin-bottom:2px;">
+                    Assistente indisponível
+                </div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.5);">{erro}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    # Extrai texto do PDF (cache por sessão)
+    if key_ctx not in st.session_state:
+        with st.spinner("Analisando documento..."):
+            texto = _extrair_texto_pdf(doc["path"])
+            st.session_state[key_ctx] = texto
+
+    texto_doc = st.session_state[key_ctx]
+
+    if not texto_doc:
+        st.warning("Não foi possível extrair texto deste PDF. O documento pode estar em formato de imagem.")
+        return
+
+    n_chars = len(texto_doc)
+    n_pags  = texto_doc.count("[Página")
+
+    st.markdown(f"""
+    <div style="display:flex;gap:16px;margin-bottom:16px;">
+        <span style="font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;
+                     border-radius:10px;background:rgba(64,123,110,0.1);color:#407b6e;
+                     border:1px solid rgba(64,123,110,0.25);">
+            {n_pags} páginas indexadas
+        </span>
+        <span style="font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;
+                     border-radius:10px;background:rgba(64,123,110,0.1);color:#407b6e;
+                     border:1px solid rgba(64,123,110,0.25);">
+            {n_chars:,} caracteres
+        </span>
+        <span style="font-size:11px;font-family:'DM Mono',monospace;padding:3px 10px;
+                     border-radius:10px;background:rgba(74,219,138,0.1);color:#4adb8a;
+                     border:1px solid rgba(74,219,138,0.25);">
+            ● Assistente pronto
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Mensagem inicial do assistente
+    if not st.session_state[key_ini]:
+        msg_inicial = (
+            f"Olá! Sou o **Assistente RAIZ** e analisei o documento **{doc['nome_base']}** "
+            f"({n_pags} páginas). "
+            f"Pode me perguntar sobre qualquer cláusula, condição ou informação presente neste documento. "
+            f"Também posso ajudar com dúvidas gerais sobre FIDCs e mercado financeiro."
+        )
+        st.session_state[key_hist].append({
+            "role": "assistant",
+            "content": msg_inicial
+        })
+        st.session_state[key_ini] = True
+
+    # ── Histórico do chat ──
+    for msg in st.session_state[key_hist]:
+        is_user = msg["role"] == "user"
+        prefixo = "Você" if is_user else "Assistente RAIZ"
+        cor_pre = "#407b6e" if is_user else "#c8f55a"
+        bg      = "rgba(64,123,110,0.1)" if is_user else "rgba(255,255,255,0.02)"
+        borda   = "rgba(64,123,110,0.3)" if is_user else "rgba(255,255,255,0.08)"
+
+        st.markdown(f"""
+        <div style="background:{bg};border:1px solid {borda};border-radius:12px;
+                    padding:4px 16px 4px;margin-bottom:12px;">
+            <div style="font-size:10px;font-family:'DM Mono',monospace;color:{cor_pre};
+                        margin-top:10px;letter-spacing:0.08em;text-transform:uppercase;">
+                {prefixo}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        # Renderiza o conteúdo com st.markdown nativo para suportar formatação
+        with st.container():
+            st.markdown(msg["content"])
+        st.markdown("<div style='margin-bottom:4px;'></div>", unsafe_allow_html=True)
+
+    # ── Input do usuário ──
+    col_input, col_btn = st.columns([5, 1])
+
+    with col_input:
+        st.markdown('<span style="font-size:11px;font-family:DM Mono,monospace;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;margin-bottom:4px;display:block;">Sua pergunta</span>', unsafe_allow_html=True)
+        pergunta = st.text_input(
+            "pergunta",
+            placeholder="Ex: Qual é a política de concentração de cedentes?",
+            label_visibility="collapsed",
+            key=f"input_{stem}",
+        )
+
+    with col_btn:
+        st.markdown("<div style='padding-top:22px;'>", unsafe_allow_html=True)
+        enviar = st.button("Enviar →", use_container_width=True, type="primary",
+                           key=f"enviar_{stem}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if enviar and pergunta.strip():
+        # Adiciona pergunta ao histórico
+        st.session_state[key_hist].append({
+            "role": "user",
+            "content": pergunta.strip()
+        })
+
+        # Monta histórico para o Gemini
+        with st.spinner("Assistente RAIZ está analisando..."):
+            try:
+                system = _system_prompt(doc["nome_base"], texto_doc)
+
+                # Monta conversa completa
+                historico_fmt = []
+                for m in st.session_state[key_hist][1:]:  # pula msg inicial
+                    role = "user" if m["role"] == "user" else "model"
+                    historico_fmt.append({"role": role, "parts": [m["content"]]})
+
+                chat = model.start_chat(history=historico_fmt[:-1])
+                resposta = chat.send_message(
+                    f"{system}\n\nPergunta do usuário: {pergunta.strip()}"
+                )
+                texto_resposta = resposta.text
+
+            except Exception as e:
+                texto_resposta = f"Ocorreu um erro ao processar sua pergunta: {str(e)}"
+
+        st.session_state[key_hist].append({
+            "role": "assistant",
+            "content": texto_resposta,
+        })
+        st.rerun()
+
+    # Botão limpar histórico
+    if len(st.session_state[key_hist]) > 1:
+        st.markdown("<div style='margin-top:8px;'>", unsafe_allow_html=True)
+        if st.button("🗑 Limpar conversa", key=f"limpar_{stem}"):
+            st.session_state[key_hist] = []
+            st.session_state[key_ini]  = False
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 def main():
     _estilo()
 
@@ -573,7 +813,7 @@ def main():
 
     with col_info:
         doc_atual = next((d for d in docs if d["stem"] == st.session_state.doc_selecionado), docs[0])
-        tab_pdf, tab_resumo, tab_notas = st.tabs(["📄 Visualizar documento", "✨ Resumo com IA", "📝 Notas"])
+        tab_pdf, tab_resumo, tab_notas, tab_chat = st.tabs(["📄 Visualizar documento", "✨ Resumo com IA", "📝 Notas", "💬 Chat"])
 
         with tab_pdf:
             _aba_pdf(doc_atual)
@@ -581,6 +821,8 @@ def main():
             _aba_resumo(BASE_DIR, fundo_id, tipo_sel, doc_atual)
         with tab_notas:
             _aba_notas(BASE_DIR, fundo_id, tipo_sel, doc_atual)
+        with tab_chat:
+            _aba_chat(BASE_DIR, fundo_id, tipo_sel, doc_atual)
 
 
 if __name__ == "__main__":
