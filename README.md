@@ -2,7 +2,7 @@
 
 Repositório da solução entregue à **Núclea** no Challenge proposto em **08/2025** para as turmas de graduação da FIAP no curso de **Data Science**.
 
-Aplicação web (**Streamlit**) para análise de FIDC: dashboard operacional, documentos (PDF), precificação com modelo de ML (`fidc_model_v2.py`) e autenticação por usuários definidos em arquivo YAML.
+Aplicação web (**Streamlit**) para análise de FIDC: dashboard operacional, documentos (PDF), chatbot com documentos via Gemini, precificação com modelo de ML (`fidc_model_v2.py`) e autenticação por usuários definidos em arquivo YAML.
 
 ---
 
@@ -80,7 +80,19 @@ python manage_users.py resetar
 
 Outros comandos: `python manage_users.py listar`, `python manage_users.py criar`.
 
-### 4. Subir a aplicação Streamlit
+### 4. Configurar a chave da API Gemini para o chatbot
+
+O chatbot de documentos só funciona se houver uma chave válida da API Gemini configurada localmente. Crie a pasta `.streamlit` na raiz do projeto, caso ela ainda não exista, e adicione o arquivo `.streamlit/secrets.toml` com o conteúdo abaixo:
+
+```toml
+GEMINI_API_KEY = "sua_chave_aqui"
+```
+
+Sem essa configuração, a aplicação pode ser iniciada normalmente, mas a funcionalidade de chatbot ficará indisponível.
+
+Importante: esse arquivo deve permanecer apenas no ambiente local e não deve ser versionado no Git.
+
+### 5. Subir a aplicação Streamlit
 
 **Opção A — script na raiz**
 
@@ -96,7 +108,7 @@ python -m streamlit run app.py
 
 O terminal exibirá uma URL local (em geral `http://localhost:8501`). Abra no navegador e faça login.
 
-### 5. Dados de exemplo (opcional)
+### 6. Dados de exemplo (opcional)
 
 Para o dashboard e o processamento exibirem conteúdo, coloque arquivos **XML** de informe nas pastas `data/funds/<id>/informes/inbox/` conforme os IDs definidos em `config/funds.yaml` (por exemplo `xama`). PDFs de documentos seguem a estrutura sob `data/funds/<id>/documentos/`, conforme a página **Documentos** da aplicação.
 
